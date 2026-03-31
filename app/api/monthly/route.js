@@ -13,7 +13,7 @@ export async function GET() {
     function groupRows(rows) {
       const groups = {};
       for (const row of rows) {
-        const cat = row['Category'] || 'Unknown'; const adProp = row['AD_PROPERTY'] || 'Unknown';
+        const cat = row['Category'] || row['L1_CATEGORY'] || 'Unknown'; const adProp = row['AD_PROPERTY'] || 'Unknown';
         const key = cat + '|||' + adProp;
         if (!groups[key]) groups[key] = { category: cat, adProperty: adProp, rows: [] };
         groups[key].rows.push(row);
