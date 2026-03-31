@@ -64,6 +64,6 @@ export async function GET() {
     results.sort((a, b) => { const cd = (catSpend[b.category]||0)-(catSpend[a.category]||0); return cd !== 0 ? cd : b.currentSpend - a.currentSpend; });
     const result = { currentLabel: current.label, previousLabel: previous?.label ?? null, currDays, prevDays, data: results };
     setCached(cacheKey, result);
-    return Response.json(result);
+    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=60' } });
   } catch (err) { console.error(err); return Response.json({ error: err.message }, { status: 500 }); }
 }
