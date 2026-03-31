@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 
 function fmt(n, decimals = 2) {
   if (n === null || n === undefined) return '—';
@@ -40,7 +40,11 @@ export default function MonthlyRoas() {
   useEffect(() => {
     fetch('/api/monthly')
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+        setLoading(false);
+      })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
@@ -54,7 +58,7 @@ export default function MonthlyRoas() {
   );
 
   if (error) return <div className="p-6 text-red-600 bg-red-50 rounded-lg">Error: {error}</div>;
-  if (!data) return null;
+  if (!data || !Array.isArray(data.data)) return null;
 
   const byCategory = {};
   for (const row of data.data) {
@@ -90,20 +94,18 @@ export default function MonthlyRoas() {
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat, catIdx) => {
+            {categories.map((cat) => {
               const rows = byCategory[cat];
               const isExpanded = expandedCats[cat] !== false;
-              const catTotalSpend = rows.reduce((s, r) => s + r.currentSpend, 0);
-
+              const catTotalSpend = rows.reduce((s, r) => s + (r.currentSpend || 0), 0);
               return (
-                <>
+                <Fragment key={cat}>
                   <tr
-                    key={`cat-${cat}`}
                     className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
                     onClick={() => toggleCat(cat)}
                   >
-                    <td className="px-4 py-2.5 font-semibold text-gray-800 flex items-center gap-2">
-                      <span className="text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                    <td className="px-4 py-2.5 font-semibold text-gray-800">
+                      <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : '▶'}</span>
                       {cat}
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-700">
@@ -113,12 +115,8 @@ export default function MonthlyRoas() {
                       {rows.length} ad type{rows.length !== 1 ? 's' : ''}
                     </td>
                   </tr>
-
                   {isExpanded && rows.map((row, idx) => (
-                    <tr
-                      key={`row-${catIdx}-${idx}`}
-                      className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                    >
+                    <tr key={`${cat}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-2.5 pl-8 text-gray-700">
                         <span className="text-gray-400 mr-2">└</span>
                         {row.adProperty}
@@ -131,7 +129,7 @@ export default function MonthlyRoas() {
                       <ChangeCell value={row.cvrChange} />
                     </tr>
                   ))}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
