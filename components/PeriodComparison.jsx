@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { SHEETS } from '@/lib/config';
 
 function fmtSpend(n) {
@@ -45,13 +45,8 @@ export default function PeriodComparison() {
   const [expandedCats2, setExpandedCats2] = useState({});
 
   const handleCompare = async () => {
-    if (!startA || !endA || !startB || !endB) {
-      setError('Please fill in all date fields.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setData(null);
+    if (!startA || !endA || !startB || !endB) { setError('Please fill in all date fields.'); return; }
+    setLoading(true); setError(null); setData(null);
     try {
       const params = new URLSearchParams({ month, startA, endA, startB, endB });
       const r = await fetch(`/api/comparison?${params}`);
@@ -71,7 +66,7 @@ export default function PeriodComparison() {
   const toggle2 = (cat) => setExpandedCats2(p => ({ ...p, [cat]: !p[cat] }));
 
   const byCategory1 = {};
-  if (data?.table1) {
+  if (data?.table1 && Array.isArray(data.table1)) {
     for (const row of data.table1) {
       if (!byCategory1[row.category]) byCategory1[row.category] = [];
       byCategory1[row.category].push(row);
@@ -79,7 +74,7 @@ export default function PeriodComparison() {
   }
 
   const byCategory2 = {};
-  if (data?.table2) {
+  if (data?.table2 && Array.isArray(data.table2)) {
     for (const row of data.table2) {
       if (!byCategory2[row.category]) byCategory2[row.category] = {};
       if (!byCategory2[row.category][row.campaign]) byCategory2[row.category][row.campaign] = [];
@@ -94,17 +89,11 @@ export default function PeriodComparison() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Month</label>
-            <select
-              value={month}
-              onChange={e => setMonth(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {sheetOptions.map(o => (
-                <option key={o.key} value={o.key}>{o.label}</option>
-              ))}
+            <select value={month} onChange={e => setMonth(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {sheetOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
           </div>
-
           <div className="border border-blue-100 rounded-lg p-3 bg-blue-50">
             <div className="text-xs font-semibold text-blue-700 mb-2">Period A (Base)</div>
             <div className="flex gap-2">
@@ -120,7 +109,6 @@ export default function PeriodComparison() {
               </div>
             </div>
           </div>
-
           <div className="border border-orange-100 rounded-lg p-3 bg-orange-50">
             <div className="text-xs font-semibold text-orange-700 mb-2">Period B (Compare)</div>
             <div className="flex gap-2">
@@ -137,13 +125,9 @@ export default function PeriodComparison() {
             </div>
           </div>
         </div>
-
         <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={handleCompare}
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
+          <button onClick={handleCompare} disabled={loading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {loading ? 'Loading…' : 'Compare Periods'}
           </button>
           {loading && <p className="text-sm text-gray-500">Fetching data… may take 15–20 seconds</p>}
@@ -155,9 +139,7 @@ export default function PeriodComparison() {
         <>
           <div>
             <h3 className="font-semibold text-gray-800 mb-3">Category → Ad Property Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              ROAS Δ% = change from Period A to Period B. Red = deterioration.
-            </p>
+            <p className="text-xs text-gray-500 mb-3">ROAS Δ% = change from Period A to Period B. Red = deterioration.</p>
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
                 <thead>
@@ -172,24 +154,22 @@ export default function PeriodComparison() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.keys(byCategory1).map((cat, catIdx) => {
+                  {Object.keys(byCategory1).map((cat) => {
                     const rows = byCategory1[cat];
                     const isExpanded = expandedCats1[cat] !== false;
-                    const catSpend = rows.reduce((s, r) => s + r.spendA, 0);
+                    const catSpend = rows.reduce((s, r) => s + (r.spendA || 0), 0);
                     return (
-                      <>
-                        <tr key={`t1-cat-${cat}`} className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle1(cat)}>
-                          <td className="px-4 py-2.5 font-semibold text-gray-800 flex items-center gap-2">
-                            <span className="text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</span>{cat}
+                      <Fragment key={cat}>
+                        <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle1(cat)}>
+                          <td className="px-4 py-2.5 font-semibold text-gray-800">
+                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : '▶'}</span>{cat}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
                           <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{rows.length} ad type{rows.length !== 1 ? 's' : ''}</td>
                         </tr>
                         {isExpanded && rows.map((row, idx) => (
-                          <tr key={`t1-row-${catIdx}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-4 py-2.5 pl-8 text-gray-700">
-                              <span className="text-gray-400 mr-2">└</span>{row.adProperty}
-                            </td>
+                          <tr key={`${cat}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-4 py-2.5 pl-8 text-gray-700"><span className="text-gray-400 mr-2">└</span>{row.adProperty}</td>
                             <td className="px-3 py-2 text-right text-gray-700">{fmtSpend(row.spendA)}</td>
                             <RoasCell value={row.roasA} />
                             <RoasCell value={row.roasB} />
@@ -198,7 +178,7 @@ export default function PeriodComparison() {
                             <ChangeCell value={row.cvrChange} />
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -208,9 +188,7 @@ export default function PeriodComparison() {
 
           <div>
             <h3 className="font-semibold text-gray-800 mb-1">Category → Campaign → Keyword Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">
-              Keyword Based Ads only • % of Category Spend based on Period A • Sorted by spend (high to low)
-            </p>
+            <p className="text-xs text-gray-500 mb-3">Keyword Based Ads only • % of Category Spend based on Period A • Sorted by spend (high to low)</p>
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
                 <thead>
@@ -226,28 +204,27 @@ export default function PeriodComparison() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.keys(byCategory2).map((cat, catIdx) => {
+                  {Object.keys(byCategory2).map((cat) => {
                     const campaigns = byCategory2[cat];
                     const isExpanded = expandedCats2[cat] !== false;
-                    const catSpend = Object.values(campaigns).flat().reduce((s, r) => s + r.spendA, 0);
+                    const catSpend = Object.values(campaigns).flat().reduce((s, r) => s + (r.spendA || 0), 0);
                     return (
-                      <>
-                        <tr key={`t2-cat-${cat}`} className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle2(cat)}>
-                          <td className="px-4 py-2.5 font-semibold text-gray-800 flex items-center gap-2">
-                            <span className="text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</span>{cat}
+                      <Fragment key={cat}>
+                        <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle2(cat)}>
+                          <td className="px-4 py-2.5 font-semibold text-gray-800">
+                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : '▶'}</span>{cat}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
                           <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">
                             {Object.keys(campaigns).length} campaign{Object.keys(campaigns).length !== 1 ? 's' : ''}
                           </td>
                         </tr>
-
-                        {isExpanded && Object.keys(campaigns).map((campaign, campIdx) => {
+                        {isExpanded && Object.keys(campaigns).map((campaign) => {
                           const kwRows = campaigns[campaign];
-                          const campSpend = kwRows.reduce((s, r) => s + r.spendA, 0);
+                          const campSpend = kwRows.reduce((s, r) => s + (r.spendA || 0), 0);
                           return (
-                            <>
-                              <tr key={`t2-camp-${catIdx}-${campIdx}`} className="bg-blue-50">
+                            <Fragment key={`${cat}-${campaign}`}>
+                              <tr className="bg-blue-50">
                                 <td className="px-4 py-2 pl-8 font-medium text-blue-800">
                                   <span className="text-gray-400 mr-2">└</span>{campaign}
                                 </td>
@@ -257,7 +234,7 @@ export default function PeriodComparison() {
                                 </td>
                               </tr>
                               {kwRows.map((row, kwIdx) => (
-                                <tr key={`t2-kw-${catIdx}-${campIdx}-${kwIdx}`} className={kwIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <tr key={`${cat}-${campaign}-${kwIdx}`} className={kwIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                   <td className="px-4 py-2 pl-14 text-gray-600">
                                     <span className="text-gray-300 mr-2">└</span>{row.keyword}
                                   </td>
@@ -272,10 +249,10 @@ export default function PeriodComparison() {
                                   <ChangeCell value={row.cvrChange} />
                                 </tr>
                               ))}
-                            </>
+                            </Fragment>
                           );
                         })}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
