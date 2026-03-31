@@ -1,9 +1,13 @@
 import { SHEETS, getCurrentAndPreviousMonths } from '@/lib/config';
 import { parseCSV, aggregateRows, calcPctChange } from '@/lib/dataUtils';
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
+
+const _kwCache = {};
+function getCached(k) { const e = _kwCache[k]; return (e && Date.now()-e.ts < 300000) ? e.data : null; }
+function setCached(k, d) { _kwCache[k] = { data: d, ts: Date.now() }; }
 
 async function fetchSheet(url) {
-  const resp = await fetch(url, { cache: 'no-store' });
+  const resp = await fetch(url, { next: { revalidate: 300 } });
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
   return parseCSV(await resp.text());
 }
@@ -59,6 +63,10 @@ export async function GET(request) {
     const keyIdx = sortedKeys.indexOf(key);
     const prevKey = keyIdx > 0 ? sortedKeys[keyIdx - 1] : null;
     const prevSheet = prevKey ? SHEETS[prevKey] : null;
+
+    const cacheKey = key + '_' + (prevKey || '');
+    const cached = getCached(cacheKey);
+    if (cached) return Response.json(cached);
 
     const [currRows, prevRows] = await Promise.all([
       fetchSheet(sheet.url),
@@ -153,14 +161,17 @@ export async function GET(request) {
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([k, v]) => ({ key: k, label: v.label }));
 
-    return Response.json({
+    const result = {
       monthLabel: sheet.label,
       monthKey: key,
       prevMonthLabel: prevSheet ? prevSheet.label : null,
       data: table,
       insights,
       availableMonths,
-    });
+    };
+
+    setCached(cacheKey, result);
+    return Response.json(result);
   } catch (err) {
     console.error(err);
     return Response.json({ error: err.message }, { status: 500 });
