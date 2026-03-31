@@ -171,7 +171,7 @@ export async function GET(request) {
     };
 
     setCached(cacheKey, result);
-    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=60' } });
+    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' } });
   } catch (err) {
     console.error(err);
     return Response.json({ error: err.message }, { status: 500 });
