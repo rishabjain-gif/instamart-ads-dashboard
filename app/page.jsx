@@ -3,7 +3,12 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 const MonthlyRoas = dynamic(() => import('@/components/MonthlyRoas'), { ssr: false });
 const PeriodComparison = dynamic(() => import('@/components/PeriodComparison'), { ssr: false });
-const TABS = [{ id: 'monthly', label: '📅 Monthly ROAS' }, { id: 'comparison', label: '🔍 Period Comparison' }];
+const KeywordAnalysis = dynamic(() => import('@/components/KeywordAnalysis'), { ssr: false });
+const TABS = [
+  { id: 'monthly', label: '📅 Monthly ROAS' },
+  { id: 'comparison', label: '🔍 Period Comparison' },
+  { id: 'keywords', label: '🎯 Keyword Analysis' },
+];
 export default function Home() {
   const [activeTab, setActiveTab] = useState('monthly');
   return (
@@ -30,6 +35,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         {activeTab === 'monthly' && <MonthlyRoas />}
         {activeTab === 'comparison' && <PeriodComparison />}
+        {activeTab === 'keywords' && <KeywordAnalysis />}
       </div>
     </div>
   );
