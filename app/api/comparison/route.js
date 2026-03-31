@@ -18,7 +18,7 @@ export async function GET(request) {
     const [rowsA, rowsB] = await Promise.all([fetchAndFilter(sheet.url,parseInputDate(startA),parseInputDate(endA)), fetchAndFilter(sheet.url,parseInputDate(startB),parseInputDate(endB))]);
     function groupAdProp(rows) {
       const g = {};
-      for (const row of rows) { const cat=row['Category']||'Unknown'; const adProp=row['AD_PROPERTY']||'Unknown'; const key=cat+'|||'+adProp;
+      for (const row of rows) { const cat=row['Category']||row['L1_CATEGORY']||'Unknown'; const adProp=row['AD_PROPERTY']||'Unknown'; const key=cat+'|||'+adProp;
         if (!g[key]) g[key]={category:cat,adProperty:adProp,rows:[]}; g[key].rows.push(row); } return g; }
     const apA=groupAdProp(rowsA), apB=groupAdProp(rowsB), apKeys=new Set([...Object.keys(apA),...Object.keys(apB)]);
     const table1=[];
@@ -32,7 +32,7 @@ export async function GET(request) {
     const kwA=rowsA.filter(r=>r['AD_PROPERTY']==='Keyword Based Ads'), kwB=rowsB.filter(r=>r['AD_PROPERTY']==='Keyword Based Ads');
     function groupKeyword(rows) {
       const g={};
-      for(const row of rows){const cat=row['Category']||'Unknown',campaign=row['CAMPAIGN_NAME']||'Unknown',keyword=row['KEYWORD']||'Unknown',key=cat+'|||'+campaign+'|||'+keyword;
+      for(const row of rows){const cat=row['Category']||row['L1_CATEGORY']||'Unknown',campaign=row['CAMPAIGN_NAME']||'Unknown',keyword=row['KEYWORD']||'Unknown',key=cat+'|||'+campaign+'|||'+keyword;
         if(!g[key])g[key]={category:cat,campaign,keyword,rows:[]}; g[key].rows.push(row);} return g;}
     const kwGA=groupKeyword(kwA),kwGB=groupKeyword(kwB),kwKeys=new Set([...Object.keys(kwGA),...Object.keys(kwGB)]);
     const catTotalA={};
