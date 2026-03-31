@@ -4,11 +4,15 @@ import dynamic from 'next/dynamic';
 const MonthlyRoas = dynamic(() => import('@/components/MonthlyRoas'), { ssr: false });
 const PeriodComparison = dynamic(() => import('@/components/PeriodComparison'), { ssr: false });
 const KeywordAnalysis = dynamic(() => import('@/components/KeywordAnalysis'), { ssr: false });
+const CampaignInsights = dynamic(() => import('@/components/CampaignInsights'), { ssr: false });
+
 const TABS = [
   { id: 'monthly', label: '📅 Monthly ROAS' },
   { id: 'comparison', label: '🔍 Period Comparison' },
   { id: 'keywords', label: '🎯 Keyword Analysis' },
+  { id: 'insights', label: '🚨 Campaign Insights' },
 ];
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('monthly');
   return (
@@ -26,7 +30,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex gap-0">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              className={'px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ' + (activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')}>
               {tab.label}
             </button>
           ))}
@@ -36,6 +40,7 @@ export default function Home() {
         {activeTab === 'monthly' && <MonthlyRoas />}
         {activeTab === 'comparison' && <PeriodComparison />}
         {activeTab === 'keywords' && <KeywordAnalysis />}
+        {activeTab === 'insights' && <CampaignInsights />}
       </div>
     </div>
   );
