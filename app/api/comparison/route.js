@@ -58,6 +58,6 @@ export async function GET(request) {
     table2.sort((a,b)=>{const cd=(catSpend2[b.category]||0)-(catSpend2[a.category]||0);if(cd!==0)return cd;const ckA=a.category+'|||'+a.campaign,ckB=b.category+'|||'+b.campaign;const campD=(campSpend2[ckB]||0)-(campSpend2[ckA]||0);return campD!==0?campD:b.spendA-a.spendA;});
     const result = {table1,table2};
     setCached(cacheKey, result);
-    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=60' } });
+    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' } });
   } catch(err){console.error(err);return Response.json({error:err.message},{status:500});}
 }
