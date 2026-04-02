@@ -35,13 +35,21 @@ export async function GET(request) {
       fetchAndFilter(sheet.url, parseInputDate(startB), parseInputDate(endB))
     ]);
 
+        function normalizeBrand(b) {
+                const s = (b || '').trim().toLowerCase().replace(/\s+/g, '');
+                if (s === 'bebodywise') return 'Be Bodywise';
+                if (s === 'manmatters') return 'Man Matters';
+                if (s === 'littlejoys') return 'Little Joys';
+                return b || 'Unknown';
+        }
+    
     function groupBrand(rows) {
       const g = {};
       for (const row of rows) {
         const cat = row['Cat'] || row['Category'] || 'Unknown';
-        const brand = row['BrandName'] || 'Unknown';
-        const key = cat + '|||' + brand;
-        if (!g[key]) g[key] = { category: cat, adProperty: brand, rows: [] };
+                const brand = normalizeBrand(row['BrandName']);
+                const key = brand + '|||' + cat;
+                if (!g[key]) g[key] = { category: brand, adProperty: cat, rows: [] };
         g[key].rows.push(row);
       }
       return g;
