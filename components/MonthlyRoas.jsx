@@ -28,18 +28,22 @@ function SpendCell({ value }) {
   return <td className="px-3 py-2 text-right text-sm text-gray-700">{fmtSpend(value)}</td>;
 }
 
-export default function MonthlyRoas() {
+export default function MonthlyRoas({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedCats, setExpandedCats] = useState({});
 
   useEffect(() => {
-    fetch('/api/monthly')
+    setLoading(true);
+    setData(null);
+    setError(null);
+    const url = platform === 'zepto' ? '/api/zepto/monthly' : '/api/monthly';
+    fetch(url)
       .then(r => r.json())
       .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
-  }, []);
+  }, [platform]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -74,7 +78,7 @@ export default function MonthlyRoas() {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-800 text-white">
-              <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>
+              {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-56">Category / Brand</th> : <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>}
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
               <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
               <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
