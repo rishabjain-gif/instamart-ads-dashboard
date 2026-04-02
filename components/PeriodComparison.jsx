@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, Fragment } from 'react';
 import { SHEETS } from '@/lib/config';
+import { ZEPTO_SHEETS } from '@/lib/zeptoConfig';
 
 function fmtSpend(n) {
   if (!n) return '₹0';
@@ -31,10 +32,12 @@ function getDefaultDates() {
   return { startA: fmt(startA), endA: fmt(endA), startB: fmt(startB), endB: fmt(endB) };
 }
 
-const sheetOptions = Object.entries(SHEETS).map(([key, val]) => ({ key, label: val.label }));
+// sheetOptions computed inside component based on platform
 
-export default function PeriodComparison() {
-  const latestKey = Object.keys(SHEETS).sort().at(-1);
+export default function PeriodComparison({ platform = 'instamart' }) {
+  const sheets = platform === 'zepto' ? ZEPTO_SHEETS : SHEETS;
+  const sheetOptions = Object.entries(sheets).map(([key, val]) => ({ key, label: val.label }));
+  const latestKey = Object.keys(sheets).sort().at(-1);
   const defaults = getDefaultDates();
   const [month, setMonth] = useState(latestKey);
   const [startA, setStartA] = useState(defaults.startA);
@@ -64,6 +67,15 @@ export default function PeriodComparison() {
     const d = getDefaultDates();
     runCompare(d.startA, d.endA, d.startB, d.endB, latestKey);
   }, []);
+
+  useEffect(() => {
+    const newSheets = platform === 'zepto' ? ZEPTO_SHEETS : SHEETS;
+    const newLatest = Object.keys(newSheets).sort().at(-1);
+    setMonth(newLatest);
+    setData(null);
+    const d = getDefaultDates();
+    runCompare(d.startA, d.endA, d.startB, d.endB, newLatest);
+  }, [platform]);
 
   const handleCompare = () => {
     if (!startA || !endA || !startB || !endB) { setError('Please fill in all date fields.'); return; }
@@ -152,7 +164,7 @@ export default function PeriodComparison() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-800 text-white">
-                    <th className="px-4 py-3 text-left font-semibold w-64">Category / Ad Property</th>
+                    {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-64">Category / Brand</th> : <th className="px-4 py-3 text-left font-semibold w-64">Category / Ad Property</th>}
                     <th className="px-3 py-3 text-right font-semibold">Spend A</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS A</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS B</th>
