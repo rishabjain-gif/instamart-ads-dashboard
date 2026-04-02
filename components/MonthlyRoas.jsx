@@ -78,7 +78,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-800 text-white">
-              {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-56">Category / Brand</th> : <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>}
+              {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-56">Brand / Category</th> : <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>}
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
               <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
               <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
