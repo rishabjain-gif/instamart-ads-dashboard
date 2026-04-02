@@ -20,7 +20,7 @@ function DeltaCell({ value, inverse }) {
   return <td className={'px-2 py-2 text-center text-xs font-medium ' + color + ' ' + bg}>{arrow} {Math.abs(value).toFixed(1)}%</td>;
 }
 
-export default function KeywordAnalysis() {
+export default function KeywordAnalysis({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,7 +31,7 @@ export default function KeywordAnalysis() {
 
   function loadData(month) {
     setLoading(true); setError(null);
-    fetch('/api/keywords' + (month ? '?month=' + month : ''))
+    fetch((platform === 'zepto' ? '/api/zepto/keywords' : '/api/keywords') + (month ? '?month=' + month : ''))
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error);
