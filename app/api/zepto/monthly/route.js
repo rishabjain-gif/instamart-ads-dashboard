@@ -33,14 +33,21 @@ export async function GET() {
 
     const currDays = daysElapsed(current.year, current.month);
     const prevDays = previous ? daysInMonth(previous.year, previous.month) : 1;
-
+    function normalizeBrand(b) {
+            const s = (b || '').trim().toLowerCase().replace(/\s+/g, '');
+            if (s === 'bebodywise') return 'Be Bodywise';
+            if (s === 'manmatters') return 'Man Matters';
+            if (s === 'littlejoys') return 'Little Joys';
+            return b || 'Unknown';
+    }
+    
     function groupRows(rows) {
       const groups = {};
       for (const row of rows) {
         const cat = row['Cat'] || row['Category'] || 'Unknown';
-        const brand = row['BrandName'] || 'Unknown';
-        const key = cat + '|||' + brand;
-        if (!groups[key]) groups[key] = { category: cat, adProperty: brand, rows: [] };
+                const brand = normalizeBrand(row['BrandName']);
+                const key = brand + '|||' + cat;
+                if (!groups[key]) groups[key] = { category: brand, adProperty: cat, rows: [] };
         groups[key].rows.push(row);
       }
       return groups;
