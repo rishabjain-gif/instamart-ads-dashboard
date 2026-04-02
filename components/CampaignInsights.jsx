@@ -66,7 +66,7 @@ function InsightCard({ ins, prevMonthLabel }) {
   );
 }
 
-export default function CampaignInsights() {
+export default function CampaignInsights({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -74,7 +74,7 @@ export default function CampaignInsights() {
 
   function loadData(month) {
     setLoading(true); setError(null);
-    fetch('/api/keywords' + (month ? '?month=' + month : ''))
+    fetch((platform === 'zepto' ? '/api/zepto/keywords' : '/api/keywords') + (month ? '?month=' + month : ''))
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error);
