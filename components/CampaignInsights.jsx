@@ -45,6 +45,20 @@ function InsightCard({ ins, prevMonthLabel }) {
           </div>
           <p className="text-xs text-gray-600"><span className="font-semibold text-gray-700">Why: </span>{ins.reason}</p>
           <p className="text-xs text-gray-600 mt-0.5"><span className="font-semibold text-gray-700">Action: </span>{ins.action}</p>
+          {ins.topKeywords && ins.topKeywords.length > 0 && (
+            <div className="mt-2.5">
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Keyword breakdown (worst ROAS first):</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ins.topKeywords.map((kw, i) => (
+                  <span key={i} className={'text-xs px-2 py-0.5 rounded-full font-medium ' +
+                    (kw.roas === null || kw.roas === 0 ? 'bg-red-100 text-red-800' :
+                     kw.roas < 1.5 ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800')}>
+                    {kw.keyword} · {kw.roas !== null ? kw.roas.toFixed(2) + 'x' : '0x'}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 items-center shrink-0">
           <div className="text-center">
@@ -61,6 +75,57 @@ function InsightCard({ ins, prevMonthLabel }) {
             <div className="text-sm font-bold">▼{Math.abs(ins.roasChange).toFixed(1)}%</div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StrategicSuggestions({ suggestions }) {
+  if (!suggestions || suggestions.length === 0) return null;
+  const typeLabels = {
+    ad_property_winner: 'Budget Reallocation',
+    scale_opportunity: 'Scale Opportunity',
+    budget_waste: 'Budget Waste',
+    efficiency_decline: 'Efficiency Alert',
+  };
+  const priorityCfg = {
+    high: { icon: '🔴', badge: 'bg-red-100 text-red-700', border: 'border-l-red-400' },
+    medium: { icon: '🟡', badge: 'bg-amber-100 text-amber-700', border: 'border-l-amber-400' },
+    low: { icon: '🔵', badge: 'bg-blue-100 text-blue-700', border: 'border-l-blue-400' },
+  };
+  return (
+    <div className="mt-8">
+      <h3 className="text-base font-semibold text-gray-800 mb-3">Strategic Suggestions</h3>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-gray-800 text-white">
+              <th className="px-3 py-3 text-center font-semibold w-8"></th>
+              <th className="px-4 py-3 text-left font-semibold">Type</th>
+              <th className="px-4 py-3 text-left font-semibold">Category</th>
+              <th className="px-4 py-3 text-left font-semibold">Finding</th>
+              <th className="px-4 py-3 text-left font-semibold">Recommended Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {suggestions.map((s, i) => {
+              const cfg = priorityCfg[s.priority] || priorityCfg.medium;
+              const label = typeLabels[s.type] || s.type;
+              const dotIdx = s.detail.indexOf('. ');
+              const finding = dotIdx > 0 ? s.detail.slice(0, dotIdx + 1) : s.detail;
+              const action = dotIdx > 0 ? s.detail.slice(dotIdx + 2) : '';
+              return (
+                <tr key={i} className={(i % 2 === 0 ? 'bg-white' : 'bg-gray-50') + ' border-l-4 ' + cfg.border}>
+                  <td className="px-3 py-3 text-center text-base">{cfg.icon}</td>
+                  <td className="px-4 py-3"><span className={'text-xs px-2 py-0.5 rounded-full font-medium ' + cfg.badge}>{label}</span></td>
+                  <td className="px-4 py-3 text-xs text-gray-600 font-medium">{s.category || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-700 max-w-xs">{finding}</td>
+                  <td className="px-4 py-3 text-xs text-gray-800 font-medium max-w-xs">{action}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -98,6 +163,7 @@ export default function CampaignInsights({ platform = 'instamart' }) {
   if (!data) return null;
 
   const hasInsights = data.insights && data.insights.length > 0;
+
   return (
     <div>
       <div className="mb-5 flex items-center gap-4 flex-wrap">
@@ -108,21 +174,23 @@ export default function CampaignInsights({ platform = 'instamart' }) {
             {(data.availableMonths || []).map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
           </select>
         </div>
-        {data.prevMonthLabel && (
-          <p className="text-xs text-gray-400">Keyword Based Ads • comparing vs {data.prevMonthLabel} • sorted by spend</p>
-        )}
+        {data.prevMonthLabel && <p className="text-xs text-gray-400">Keyword Based Ads • comparing vs {data.prevMonthLabel} • sorted by spend</p>}
       </div>
+
+      <h3 className="text-base font-semibold text-gray-800 mb-3">Campaign Insights</h3>
       {hasInsights ? (
         <div className="grid grid-cols-1 gap-4">
           {data.insights.map((ins, i) => <InsightCard key={i} ins={ins} prevMonthLabel={data.prevMonthLabel} />)}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="text-5xl mb-4">✅</div>
           <p className="text-gray-700 font-semibold text-lg">All campaigns stable</p>
           <p className="text-gray-400 text-sm mt-1">No campaigns with deteriorated ROAS vs {data.prevMonthLabel || 'previous month'}</p>
         </div>
       )}
+
+      {platform !== 'zepto' && <StrategicSuggestions suggestions={data.strategicSuggestions} />}
     </div>
   );
 }
