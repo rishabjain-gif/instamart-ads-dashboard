@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
+import DailyCampaignSpend from './DailyCampaignSpend';
 
 function fmtSpend(n) {
   if (!n && n !== 0) return '—';
@@ -131,6 +132,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
           </tbody>
         </table>
       </div>
+      {platform !== 'zepto' && <DailyCampaignSpend />}
       <p className="mt-3 text-xs text-gray-400">
         Avg Daily Spend Δ% = (Current MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
       </p>
