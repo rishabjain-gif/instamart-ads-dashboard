@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 const MonthlyRoas = dynamic(() => import('@/components/MonthlyRoas'), { ssr: false });
 const PeriodComparison = dynamic(() => import('@/components/PeriodComparison'), { ssr: false });
@@ -17,6 +17,21 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('monthly');
   const [platform, setPlatform] = useState('instamart');
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('platform');
+    if (p === 'zepto' || p === 'instamart') {
+      setPlatform(p);
+    }
+  }, []);
+
+  const handleSetPlatform = (p) => {
+    setPlatform(p);
+    const params = new URLSearchParams(window.location.search);
+    params.set('platform', p);
+    window.history.replaceState({}, '', '?' + params.toString());
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-gray-900 to-gray-700 text-white px-6 py-5 shadow">
@@ -30,12 +45,12 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-gray-800 rounded-lg p-1 gap-1">
               <button
-                onClick={() => setPlatform('instamart')}
+                onClick={() => handleSetPlatform('instamart')}
                 className={'px-4 py-1.5 rounded-md text-sm font-semibold transition-all ' + (platform === 'instamart' ? 'bg-orange-500 text-white shadow' : 'text-gray-400 hover:text-white')}>
                 Instamart
               </button>
               <button
-                onClick={() => setPlatform('zepto')}
+                onClick={() => handleSetPlatform('zepto')}
                 className={'px-4 py-1.5 rounded-md text-sm font-semibold transition-all ' + (platform === 'zepto' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white')}>
                 Zepto
               </button>
