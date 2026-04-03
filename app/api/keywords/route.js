@@ -58,8 +58,9 @@ function buildInsightText(curr, prev, campKeywords) {
   if (cpcChg !== null && cpcChg > 10) {
     reasons.push('CPC rose ' + cpcChg.toFixed(0) + '%');
     if (kws.length > 0) {
-      const w = kws[0];
-      actions.push('Review bids on "' + w.keyword + '" (ROAS ' + (w.roas !== null ? w.roas.toFixed(2) + 'x' : '0x') + ', may be inflating CPC)');
+      const byHighCpc = [...kws].sort((a, b) => (b.cpc || 0) - (a.cpc || 0)).slice(0, 3);
+      const names = byHighCpc.map(k => '"' + k.keyword + '" (CPC ₹' + (k.cpc ? k.cpc.toFixed(0) : '?') + ', ROAS ' + (k.roas !== null ? k.roas.toFixed(2) + 'x' : '0x') + ')').join(', ');
+      actions.push('Reduce bids on ' + names);
     }
   }
   if (cvrChg !== null && cvrChg < -10) {
