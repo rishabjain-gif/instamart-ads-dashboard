@@ -24,7 +24,7 @@ function groupByKeyword(rows) {
   const groups = {};
   const kwRows = rows.filter(r => r['AD_PROPERTY'] === 'Keyword Based Ads');
   for (const row of kwRows) {
-    const cat = row['category'] || row['Category'] || row['L1_CATEGORY'] || 'Unknown';
+    const cat = row['Category'] || '⚠️ No Category';
     const campaign = row['CAMPAIGN_NAME'] || 'Unknown';
     const keyword = row['KEYWORD'] || 'Unknown';
     const k = cat + '|||' + campaign + '|||' + keyword;
@@ -202,7 +202,7 @@ export async function GET(request) {
     // 1. Ad property comparison within category
     const adpropGroups = {};
     for (const row of currRows) {
-      const cat = row['category'] || row['Category'] || row['L1_CATEGORY'] || 'Unknown';
+      const cat = row['Category'] || '⚠️ No Category';
       const adProp = row['AD_PROPERTY'] || 'Unknown';
       const k = cat + '|||' + adProp;
       if (!adpropGroups[k]) adpropGroups[k] = { category: cat, adProperty: adProp, rows: [] };
