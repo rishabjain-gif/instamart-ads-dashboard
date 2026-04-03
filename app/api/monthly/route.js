@@ -25,12 +25,13 @@ export async function GET() {
     if (cached) return Response.json(cached);
 
     const [currentRows, prevRows] = await Promise.all([fetchSheet(current.url), previous ? fetchSheet(previous.url) : Promise.resolve([])]);
-    const currDays = daysElapsed(current.year, current.month);
+    const currDistinctDates = new Set(currentRows.map(r => r['METRICS_DATE']).filter(Boolean)).size;
+    const currDays = currDistinctDates > 0 ? currDistinctDates : daysElapsed(current.year, current.month);
     const prevDays = previous ? daysInMonth(previous.year, previous.month) : 1;
     function groupRows(rows) {
       const groups = {};
       for (const row of rows) {
-        const cat = row['category'] || row['Category'] || row['L1_CATEGORY'] || 'Unknown';
+        const cat = row['Category'] || '⚠️ No Category';
         const adProp = row['AD_PROPERTY'] || 'Unknown';
         const key = cat + '|||' + adProp;
         if (!groups[key]) groups[key] = { category: cat, adProperty: adProp, rows: [] };
