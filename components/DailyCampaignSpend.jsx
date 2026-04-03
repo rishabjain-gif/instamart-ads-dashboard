@@ -31,12 +31,19 @@ export default function DailyCampaignSpend() {
       </div>
       {alertCamps.length > 0 && (
         <div className="mb-4 space-y-1.5">
-          {alertCamps.map(camp => camp.dailyData.filter(d => d.dropPct !== null).map((day, i) => (
-            <div key={camp.campaign + i} className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs">
+          {alertCamps.map((camp, i) => (
+            <div key={camp.campaign} className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs">
               <span className="text-red-500 shrink-0 mt-0.5">⚠</span>
-              <span><span className="font-semibold text-red-800">{camp.campaign}</span>{' — spend on '}<span className="font-medium">{day.label}</span>{' was '}<span className="font-semibold">{fmtSpend(day.spend)}</span>{', down '}<span className="font-semibold text-red-700">{Math.abs(day.dropPct).toFixed(0)}%</span>{' vs 7-day avg of '}{fmtSpend(day.rollingAvg)}</span>
+              <span>
+                <span className="font-semibold text-red-800">{camp.campaign}</span>
+                {' — avg last '}<span className="font-medium">{camp.alertInfo.daysUsed4} day{camp.alertInfo.daysUsed4 > 1 ? 's' : ''}</span>
+                {' is '}<span className="font-semibold">{fmtSpend(camp.alertInfo.avg4)}</span>
+                {' vs '}<span className="font-medium">{camp.alertInfo.daysUsed14}-day avg of </span>
+                <span className="font-semibold">{fmtSpend(camp.alertInfo.avg14)}</span>
+                {' ('}<span className="font-semibold text-red-700">{Math.abs(camp.alertInfo.dropPct).toFixed(0)}% drop</span>{')'}
+              </span>
             </div>
-          )))}
+          ))}
         </div>
       )}
       <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
@@ -49,25 +56,18 @@ export default function DailyCampaignSpend() {
             <tr key={ci} className={ci % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
               <td className={'px-3 py-2 font-medium text-gray-700 sticky left-0 z-10 ' + (ci % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
                 {camp.campaign.length > 30 ? camp.campaign.slice(0, 30) + '…' : camp.campaign}
-                {camp.hasAlert && <span className="ml-1 text-red-500" title="Spend drop detected">⚠</span>}
+                {camp.hasAlert && <span className="ml-1 text-red-500" title="Avg spend last 4 days dropped vs 14-day avg">⚠</span>}
               </td>
               {camp.dailyData.map((day, di) => {
-                const isAlert = day.dropPct !== null;
                 const noData = day.spend === null;
-                let cls = 'px-2 py-2 text-center ';
-                if (noData) cls += 'text-gray-300';
-                else if (isAlert) cls += 'bg-red-100 text-red-800 font-semibold';
-                else if (day.spend > 0) cls += 'bg-blue-50 text-blue-800';
-                else cls += 'text-gray-300';
-                const title = isAlert ? '⚠ Down ' + Math.abs(day.dropPct).toFixed(0) + '% vs 7-day avg (' + fmtSpend(day.rollingAvg) + ')' : '';
-                const display = noData ? '—' : (day.spend > 0 ? fmtSpend(day.spend) : '—');
-                return <td key={di} className={cls} title={title}>{display}</td>;
+                const cls = 'px-2 py-2 text-center ' + (noData ? 'text-gray-300' : day.spend > 0 ? 'bg-blue-50 text-blue-800' : 'text-gray-300');
+                return <td key={di} className={cls}>{noData ? '—' : day.spend > 0 ? fmtSpend(day.spend) : '—'}</td>;
               })}
             </tr>
           ))}</tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-gray-400">Red = spend dropped &gt;10% vs 7-day rolling avg • Blue = normal spend • — = no data yet • Top 20 campaigns by spend</p>
+      <p className="mt-2 text-xs text-gray-400">Red ⚠ = avg spend last 4 data-days dropped &gt;10% vs 14-day avg • Blue = normal spend • — = no data yet • Top 20 campaigns by spend</p>
     </div>
   );
 }
