@@ -1,5 +1,6 @@
 import { SHEETS, getCurrentAndPreviousMonths } from '@/lib/config';
 import { parseCSV, aggregateRows, calcPctChange } from '@/lib/dataUtils';
+
 export const revalidate = 300;
 
 const _kwCache = {};
@@ -10,6 +11,13 @@ async function fetchSheet(url) {
   const resp = await fetch(url, { next: { revalidate: 300 } });
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
   return parseCSV(await resp.text());
+}
+
+function fmtS(n) {
+  if (!n || n === 0) return '\u20b90';
+  if (n >= 100000) return '\u20b9' + (n/100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\u20b9' + (n/1000).toFixed(1) + 'K';
+  return '\u20b9' + n.toFixed(0);
 }
 
 function groupByKeyword(rows) {
@@ -26,28 +34,58 @@ function groupByKeyword(rows) {
   return groups;
 }
 
-function buildInsightText(roasChg, cpcChg, cvrChg, spendChg) {
+function buildInsightText(curr, prev, campKeywords) {
+  const cpcChg = (prev.cpc > 0 && curr.cpc > 0) ? calcPctChange(curr.cpc, prev.cpc) : null;
+  const cvrChg = (prev.cvr > 0 && curr.cvr > 0) ? calcPctChange(curr.cvr, prev.cvr) : null;
+  const spendChg = calcPctChange(curr.spend, prev.spend);
+
+  const kws = campKeywords
+    .filter(k => k.spend > 0)
+    .sort((a, b) => {
+      if (a.roas === null && b.roas === null) return b.spend - a.spend;
+      if (a.roas === null) return -1;
+      if (b.roas === null) return 1;
+      return a.roas - b.roas;
+    });
+
+  const zeroRoasKws = kws.filter(k => (k.roas === null || k.roas === 0) && k.spend > 500);
+  const lowRoasKws = kws.filter(k => k.roas !== null && k.roas > 0 && k.roas < 1.5);
+  const highRoasKws = kws.filter(k => k.roas !== null && k.roas >= 3).sort((a, b) => b.roas - a.roas);
+
   const reasons = [];
   const actions = [];
+
   if (cpcChg !== null && cpcChg > 10) {
     reasons.push('CPC rose ' + cpcChg.toFixed(0) + '%');
-    actions.push('review high-CPC keywords and consider tightening match types or reducing bids');
+    if (kws.length > 0) {
+      const w = kws[0];
+      actions.push('Review bids on "' + w.keyword + '" (ROAS ' + (w.roas !== null ? w.roas.toFixed(2) + 'x' : '0x') + ', may be inflating CPC)');
+    }
   }
   if (cvrChg !== null && cvrChg < -10) {
     reasons.push('CVR dropped ' + Math.abs(cvrChg).toFixed(0) + '%');
-    actions.push('check product page quality, pricing and stock availability');
+    actions.push('Check product listing quality, pricing, and stock — conversion rate declined');
   }
-  if (spendChg > 20 && cpcChg !== null && cpcChg > 0) {
-    reasons.push('spend scaled ' + spendChg.toFixed(0) + '%');
-    actions.push('reduce budget on keywords with ROAS below target before scaling further');
+  if (zeroRoasKws.length > 0) {
+    const names = zeroRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + fmtS(k.spend) + ' spent, 0x ROAS)').join(', ');
+    actions.push('Pause ' + names + ' — spending with no returns');
+  } else if (lowRoasKws.length > 0) {
+    const names = lowRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + k.roas.toFixed(2) + 'x)').join(', ');
+    actions.push('Reduce budget on ' + names + ' — ROAS below break-even');
   }
-  if (reasons.length === 0) {
-    actions.push('audit individual keyword ROAS below and pause under-performers');
+  if (highRoasKws.length > 0 && spendChg < 10) {
+    const top = highRoasKws[0];
+    actions.push('Increase bids on "' + top.keyword + '" — strong at ' + top.roas.toFixed(2) + 'x ROAS with budget headroom');
   }
-  return {
-    reason: reasons.length ? reasons.join(', ') : 'general ROAS decline',
-    action: actions.join('; '),
-  };
+
+  if (reasons.length === 0) reasons.push('ROAS declined month-over-month');
+  if (actions.length === 0) {
+    actions.push(kws.length > 0
+      ? 'Audit keywords — worst performer: "' + kws[0].keyword + '" at ' + (kws[0].roas !== null ? kws[0].roas.toFixed(2) + 'x' : '0x') + ' ROAS'
+      : 'Audit keyword bids and pause under-performers');
+  }
+
+  return { reason: reasons.join('; '), action: actions.join('; '), topKeywords: kws.slice(0, 5) };
 }
 
 export async function GET(request) {
@@ -106,11 +144,11 @@ export async function GET(request) {
     }
 
     table.sort((a, b) => {
-      const cd = (catTotals[b.category] || 0) - (catTotals[a.category] || 0);
+      const cd = (catTotals[b.category]||0)-(catTotals[a.category]||0);
       if (cd !== 0) return cd;
       const ckA = a.category + '|||' + a.campaign;
       const ckB = b.category + '|||' + b.campaign;
-      const campD = (campTotals[ckB] || 0) - (campTotals[ckA] || 0);
+      const campD = (campTotals[ckB]||0)-(campTotals[ckA]||0);
       if (campD !== 0) return campD;
       return b.spend - a.spend;
     });
@@ -119,19 +157,18 @@ export async function GET(request) {
     const campPrevAggs = {};
     for (const [k, g] of Object.entries(currGroups)) {
       const parts = k.split('|||');
-      const category = parts[0], campaign = parts[1];
-      const ck = category + '|||' + campaign;
-      if (!campAggs[ck]) campAggs[ck] = { category, campaign, rows: [] };
+      const ck = parts[0] + '|||' + parts[1];
+      if (!campAggs[ck]) campAggs[ck] = { category: parts[0], campaign: parts[1], rows: [] };
       campAggs[ck].rows.push(...g.rows);
     }
     for (const [k, g] of Object.entries(prevGroups)) {
       const parts = k.split('|||');
-      const category = parts[0], campaign = parts[1];
-      const ck = category + '|||' + campaign;
+      const ck = parts[0] + '|||' + parts[1];
       if (!campPrevAggs[ck]) campPrevAggs[ck] = { rows: [] };
       campPrevAggs[ck].rows.push(...g.rows);
     }
 
+    // Actionable campaign insights with named keywords
     const insights = [];
     for (const [ck, cd] of Object.entries(campAggs)) {
       const parts = ck.split('|||');
@@ -145,31 +182,104 @@ export async function GET(request) {
       const cpcChg = (prev.cpc > 0 && curr.cpc > 0) ? calcPctChange(curr.cpc, prev.cpc) : null;
       const cvrChg = (prev.cvr > 0 && curr.cvr > 0) ? calcPctChange(curr.cvr, prev.cvr) : null;
       const spendChg = calcPctChange(curr.spend, prev.spend);
-      const { reason, action } = buildInsightText(roasChg, cpcChg, cvrChg, spendChg);
+      const campKws = table.filter(r => r.category === category && r.campaign === campaign);
+      const { reason, action, topKeywords } = buildInsightText(curr, prev, campKws);
       insights.push({
         category, campaign,
         spend: curr.spend, prevSpend: prev.spend, spendChange: spendChg,
         roas: curr.roas, prevRoas: prev.roas, roasChange: roasChg,
         cpc: curr.cpc, prevCpc: prev.cpc, cpcChange: cpcChg,
         cvr: curr.cvr, prevCvr: prev.cvr, cvrChange: cvrChg,
-        reason, action,
+        reason, action, topKeywords,
       });
     }
     insights.sort((a, b) => b.spend - a.spend);
 
-    const availableMonths = Object.entries(SHEETS)
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([k, v]) => ({ key: k, label: v.label }));
+    // Strategic suggestions
+    const strategicSuggestions = [];
 
-    const result = {
-      monthLabel: sheet.label,
-      monthKey: key,
-      prevMonthLabel: prevSheet ? prevSheet.label : null,
-      data: table,
-      insights,
-      availableMonths,
-    };
+    // 1. Ad property comparison within category
+    const adpropGroups = {};
+    for (const row of currRows) {
+      const cat = row['category'] || row['Category'] || row['L1_CATEGORY'] || 'Unknown';
+      const adProp = row['AD_PROPERTY'] || 'Unknown';
+      const k = cat + '|||' + adProp;
+      if (!adpropGroups[k]) adpropGroups[k] = { category: cat, adProperty: adProp, rows: [] };
+      adpropGroups[k].rows.push(row);
+    }
+    const catAdProps = {};
+    for (const [, g] of Object.entries(adpropGroups)) {
+      const agg = aggregateRows(g.rows);
+      if (agg.spend < 1000 || agg.roas <= 0) continue;
+      if (!catAdProps[g.category]) catAdProps[g.category] = [];
+      catAdProps[g.category].push({ adProperty: g.adProperty, roas: agg.roas, spend: agg.spend });
+    }
+    for (const [cat, props] of Object.entries(catAdProps)) {
+      if (props.length < 2) continue;
+      const sorted = props.sort((a, b) => b.roas - a.roas);
+      const best = sorted[0], worst = sorted[sorted.length - 1];
+      if (best.roas > worst.roas * 1.25) {
+        strategicSuggestions.push({
+          type: 'ad_property_winner', category: cat, priority: 'medium',
+          title: 'Shift budget to ' + best.adProperty + ' in ' + cat,
+          detail: best.adProperty + ' delivers ' + best.roas.toFixed(2) + 'x ROAS vs ' + worst.roas.toFixed(2) + 'x for ' + worst.adProperty + '. Reallocate spend from ' + worst.adProperty + ' (' + fmtS(worst.spend) + ') to ' + best.adProperty + ' (' + fmtS(best.spend) + ').',
+        });
+      }
+    }
 
+    // 2. High CVR, low spend — scale opportunity
+    const allCampAggs = Object.entries(campAggs).map(([, cd]) => {
+      const agg = aggregateRows(cd.rows);
+      return { campaign: cd.campaign, category: cd.category, ...agg };
+    }).filter(c => c.spend > 0);
+
+    if (allCampAggs.length > 1) {
+      const avgSpend = allCampAggs.reduce((s, c) => s + c.spend, 0) / allCampAggs.length;
+      const validCvr = allCampAggs.filter(c => c.cvr > 0);
+      const avgCvr = validCvr.length ? validCvr.reduce((s, c) => s + c.cvr, 0) / validCvr.length : 0;
+      for (const camp of allCampAggs) {
+        if (camp.cvr > avgCvr * 1.5 && camp.spend < avgSpend * 0.6 && camp.roas > 2) {
+          strategicSuggestions.push({
+            type: 'scale_opportunity', category: camp.category, campaign: camp.campaign, priority: 'high',
+            title: 'Scale up: ' + camp.campaign,
+            detail: 'CVR of ' + camp.cvr.toFixed(1) + '% is ' + ((camp.cvr/avgCvr-1)*100).toFixed(0) + '% above average with ' + camp.roas.toFixed(2) + 'x ROAS, but only ' + fmtS(camp.spend) + ' spent. Increase budget to capture more conversions.',
+          });
+        }
+      }
+      // 3. High spend, low ROAS — budget waste
+      for (const camp of allCampAggs) {
+        if (camp.spend > avgSpend * 1.5 && camp.roas > 0 && camp.roas < 1.5) {
+          strategicSuggestions.push({
+            type: 'budget_waste', category: camp.category, campaign: camp.campaign, priority: 'high',
+            title: 'Reduce budget: ' + camp.campaign,
+            detail: 'Spending ' + fmtS(camp.spend) + ' (' + ((camp.spend/avgSpend-1)*100).toFixed(0) + '% above avg) at only ' + camp.roas.toFixed(2) + 'x ROAS. Cut budget by 30-50% or pause until keywords are optimised.',
+          });
+        }
+      }
+      // 4. CPC rising, ROAS not improving — efficiency decline
+      for (const [ck, cd] of Object.entries(campAggs)) {
+        const curr = aggregateRows(cd.rows);
+        const prevData = campPrevAggs[ck];
+        if (!prevData || curr.spend < 500) continue;
+        const prev = aggregateRows(prevData.rows);
+        if (prev.cpc <= 0 || curr.cpc <= 0) continue;
+        const cpcChg = calcPctChange(curr.cpc, prev.cpc);
+        const roasChg = (curr.roas > 0 && prev.roas > 0) ? calcPctChange(curr.roas, prev.roas) : null;
+        if (cpcChg > 20 && (roasChg === null || roasChg < 5)) {
+          strategicSuggestions.push({
+            type: 'efficiency_decline', category: cd.category, campaign: cd.campaign, priority: 'medium',
+            title: 'CPC efficiency declining: ' + cd.campaign,
+            detail: 'CPC rose ' + cpcChg.toFixed(0) + '% to \u20b9' + curr.cpc.toFixed(0) + ' while ROAS ' + (roasChg !== null ? (roasChg > 0 ? 'only improved ' + roasChg.toFixed(0) + '%' : 'fell ' + Math.abs(roasChg).toFixed(0) + '%') : 'is flat') + '. Review keyword match types and reduce bids on non-converting terms.',
+          });
+        }
+      }
+    }
+
+    strategicSuggestions.sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.priority]||1) - ({ high: 0, medium: 1, low: 2 }[b.priority]||1));
+
+    const availableMonths = Object.entries(SHEETS).sort((a, b) => b[0].localeCompare(a[0])).map(([k, v]) => ({ key: k, label: v.label }));
+
+    const result = { monthLabel: sheet.label, monthKey: key, prevMonthLabel: prevSheet ? prevSheet.label : null, data: table, insights, strategicSuggestions, availableMonths };
     setCached(cacheKey, result);
     return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' } });
   } catch (err) {
