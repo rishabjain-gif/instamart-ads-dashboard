@@ -78,36 +78,47 @@ export async function GET() {
 
           const result = [];
           for (const [campaign, dateMap] of Object.entries(campaigns)) {
-                  const totalSpend = last14.reduce((s, dk) => s + (dateMap[dk] || 0), 0);
-                  if (totalSpend === 0) continue;
+            // Build per-day display data for the 14-day window
+            const dailyData = last14.map(dk => ({
+              date: dk,
+              label: fmtDate(dk),
+              spend: dateMap[dk] !== undefined ? dateMap[dk] : null,
+            }));
 
-                  const dailyData = [];
-                  let hasAlert = false;
+            // Only count days that actually have data
+            const daysWithData = last14.filter(dk => dateMap[dk] !== undefined);
+            if (daysWithData.length === 0) continue;
 
-                  for (const dk of last14) {
-                            const spend = dateMap[dk] !== undefined ? dateMap[dk] : null;
-                            const idx = all20.indexOf(dk);
-                            const prevSlice = all20.slice(Math.max(0, idx - 7), idx);
-                            const validPrev = prevSlice.filter(d => dateMap[d] !== undefined && dateMap[d] > 0);
-                            const rollingAvg = validPrev.length >= 3
-                              ? validPrev.reduce((s, d) => s + dateMap[d], 0) / validPrev.length
-                              : null;
-                            const dropPct = (spend !== null && rollingAvg && rollingAvg > 0 && spend < rollingAvg * 0.9)
-                              ? ((spend - rollingAvg) / rollingAvg) * 100 : null;
-                            if (dropPct !== null) hasAlert = true;
-                            dailyData.push({ date: dk, label: fmtDate(dk), spend, rollingAvg, dropPct });
-                          }
+            const totalSpend = daysWithData.reduce((s, dk) => s + dateMap[dk], 0);
+            if (totalSpend === 0) continue;
 
-                  result.push({ campaign, totalSpend, dailyData, hasAlert });
-                }
+            // 14-day avg based on actual data days present
+            const avg14 = totalSpend / daysWithData.length;
+
+            // Last 4 days with data (most recent first, then reversed)
+            const last4WithData = daysWithData.slice(-4);
+            const avg4 = last4WithData.reduce((s, dk) => s + dateMap[dk], 0) / last4WithData.length;
+
+            // Alert: avg of last 4 data-days dropped vs avg of all data-days in window
+            const hasAlert = avg14 > 0 && avg4 < avg14 * 0.9;
+            const alertInfo = hasAlert ? {
+              avg4,
+              avg14,
+              dropPct: ((avg4 - avg14) / avg14) * 100,
+              daysUsed4: last4WithData.length,
+              daysUsed14: daysWithData.length,
+            } : null;
+
+            result.push({ campaign, totalSpend, dailyData, hasAlert, alertInfo });
+          }
 
           result.sort((a, b) => b.totalSpend - a.totalSpend);
 
           const out = {
-                  dates: last14,
-                  dateLabels: last14.map(fmtDate),
-                  campaigns: result.slice(0, 20),
-                };
+            dates: last14,
+            dateLabels: last14.map(fmtDate),
+            campaigns: result.slice(0, 20),
+          };
           setCached(cacheKey, out);
           return new Response(JSON.stringify(out), {
                   headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' }
