@@ -85,14 +85,14 @@ export async function GET() {
                   let hasAlert = false;
 
                   for (const dk of last14) {
-                            const spend = dateMap[dk] || 0;
+                            const spend = dateMap[dk] !== undefined ? dateMap[dk] : null;
                             const idx = all20.indexOf(dk);
                             const prevSlice = all20.slice(Math.max(0, idx - 7), idx);
-                            const validPrev = prevSlice.filter(d => (dateMap[d] || 0) > 0);
+                            const validPrev = prevSlice.filter(d => dateMap[d] !== undefined && dateMap[d] > 0);
                             const rollingAvg = validPrev.length >= 3
-                              ? validPrev.reduce((s, d) => s + (dateMap[d] || 0), 0) / validPrev.length
+                              ? validPrev.reduce((s, d) => s + dateMap[d], 0) / validPrev.length
                               : null;
-                            const dropPct = (rollingAvg && rollingAvg > 0 && spend < rollingAvg * 0.9)
+                            const dropPct = (spend !== null && rollingAvg && rollingAvg > 0 && spend < rollingAvg * 0.9)
                               ? ((spend - rollingAvg) / rollingAvg) * 100 : null;
                             if (dropPct !== null) hasAlert = true;
                             dailyData.push({ date: dk, label: fmtDate(dk), spend, rollingAvg, dropPct });
