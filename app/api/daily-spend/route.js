@@ -15,7 +15,9 @@ async function fetchSheet(url) {
 
 function parseIMDate(str) {
     if (!str) return null;
-    const parts = str.trim().split('/');
+    const s = str.trim();
+    const sep = s.includes('/') ? '/' : '-';
+    const parts = s.split(sep);
     if (parts.length !== 3) return null;
     const [d, m, y] = parts;
     const parsed = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
