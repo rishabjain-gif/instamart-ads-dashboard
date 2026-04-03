@@ -53,17 +53,21 @@ export default function DailyCampaignSpend() {
               </td>
               {camp.dailyData.map((day, di) => {
                 const isAlert = day.dropPct !== null;
+                const noData = day.spend === null;
                 let cls = 'px-2 py-2 text-center ';
-                if (isAlert) cls += 'bg-red-100 text-red-800 font-semibold';
+                if (noData) cls += 'text-gray-300';
+                else if (isAlert) cls += 'bg-red-100 text-red-800 font-semibold';
                 else if (day.spend > 0) cls += 'bg-blue-50 text-blue-800';
                 else cls += 'text-gray-300';
-                return <td key={di} className={cls} title={isAlert ? '⚠ Down ' + Math.abs(day.dropPct).toFixed(0) + '% vs 7-day avg (' + fmtSpend(day.rollingAvg) + ')' : ''}>{day.spend > 0 ? fmtSpend(day.spend) : '—'}</td>;
+                const title = isAlert ? '⚠ Down ' + Math.abs(day.dropPct).toFixed(0) + '% vs 7-day avg (' + fmtSpend(day.rollingAvg) + ')' : '';
+                const display = noData ? '—' : (day.spend > 0 ? fmtSpend(day.spend) : '—');
+                return <td key={di} className={cls} title={title}>{display}</td>;
               })}
             </tr>
           ))}</tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-gray-400">Red = spend dropped &gt;10% vs 7-day rolling avg • Hover red cells for details • Top 20 campaigns by spend</p>
+      <p className="mt-2 text-xs text-gray-400">Red = spend dropped &gt;10% vs 7-day rolling avg • Blue = normal spend • — = no data yet • Top 20 campaigns by spend</p>
     </div>
   );
 }
