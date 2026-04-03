@@ -15,7 +15,7 @@ async function fetchSheet(url) {
 
 function parseIMDate(str) {
     if (!str) return null;
-    const parts = str.split('-');
+    const parts = str.trim().split('/');
     if (parts.length !== 3) return null;
     const [d, m, y] = parts;
     const parsed = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -56,7 +56,7 @@ export async function GET() {
 
           for (const row of allRows) {
                   const campaign = row['CAMPAIGN_NAME'] || 'Unknown';
-                  const dateStr = row['Date'] || row['date'];
+                  const dateStr = row['METRICS_DATE'];
                   if (!dateStr) continue;
                   const date = parseIMDate(dateStr);
                   if (!date || date < windowStart || date > today) continue;
