@@ -50,9 +50,7 @@ function InsightCard({ ins, prevMonthLabel }) {
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Keyword breakdown (worst ROAS first):</p>
               <div className="flex flex-wrap gap-1.5">
                 {ins.topKeywords.map((kw, i) => (
-                  <span key={i} className={'text-xs px-2 py-0.5 rounded-full font-medium ' +
-                    (kw.roas === null || kw.roas === 0 ? 'bg-red-100 text-red-800' :
-                     kw.roas < 1.5 ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800')}>
+                  <span key={i} className={'text-xs px-2 py-0.5 rounded-full font-medium ' + (kw.roas === null || kw.roas === 0 ? 'bg-red-100 text-red-800' : kw.roas < 1.5 ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800')}>
                     {kw.keyword} · {kw.roas !== null ? kw.roas.toFixed(2) + 'x' : '0x'}
                   </span>
                 ))}
@@ -138,18 +136,20 @@ export default function CampaignInsights({ platform = 'instamart' }) {
   const [selectedMonth, setSelectedMonth] = useState('');
 
   function loadData(month) {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     fetch((platform === 'zepto' ? '/api/zepto/keywords' : '/api/keywords') + (month ? '?month=' + month : ''))
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error);
-        setData(d); setLoading(false);
+        setData(d);
+        setLoading(false);
         if (!selectedMonth && d.monthKey) setSelectedMonth(d.monthKey);
       })
       .catch(e => { setError(e.message); setLoading(false); });
   }
 
-  useEffect(() => { loadData(''); }, []);
+  useEffect(() => { loadData(''); }, [platform]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -169,14 +169,15 @@ export default function CampaignInsights({ platform = 'instamart' }) {
       <div className="mb-5 flex items-center gap-4 flex-wrap">
         <div>
           <label className="text-sm text-gray-600 mr-2 font-medium">Month:</label>
-          <select className="text-sm border border-gray-300 rounded px-2 py-1 bg-white" value={selectedMonth}
+          <select
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+            value={selectedMonth}
             onChange={e => { setSelectedMonth(e.target.value); loadData(e.target.value); }}>
             {(data.availableMonths || []).map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
           </select>
         </div>
-        {data.prevMonthLabel && <p className="text-xs text-gray-400">Keyword Based Ads • comparing vs {data.prevMonthLabel} • sorted by spend</p>}
+        {data.prevMonthLabel && <p className="text-xs text-gray-400">comparing vs {data.prevMonthLabel} • sorted by spend</p>}
       </div>
-
       <h3 className="text-base font-semibold text-gray-800 mb-3">Campaign Insights</h3>
       {hasInsights ? (
         <div className="grid grid-cols-1 gap-4">
@@ -189,8 +190,7 @@ export default function CampaignInsights({ platform = 'instamart' }) {
           <p className="text-gray-400 text-sm mt-1">No campaigns with deteriorated ROAS vs {data.prevMonthLabel || 'previous month'}</p>
         </div>
       )}
-
-      {platform !== 'zepto' && <StrategicSuggestions suggestions={data.strategicSuggestions} />}
+      <StrategicSuggestions suggestions={data.strategicSuggestions} />
     </div>
   );
 }
