@@ -42,7 +42,11 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
     const url = platform === 'zepto' ? '/api/zepto/monthly' : '/api/monthly';
     fetch(url)
       .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false); })
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+        setLoading(false);
+      })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [platform]);
 
@@ -79,7 +83,9 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-800 text-white">
-              {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-56">Brand / Category</th> : <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>}
+              {platform === 'zepto'
+                ? <th className="px-4 py-3 text-left font-semibold w-56">Brand / Category</th>
+                : <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>}
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
               <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
               <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
@@ -132,7 +138,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
           </tbody>
         </table>
       </div>
-      {platform !== 'zepto' && <DailyCampaignSpend />}
+      <DailyCampaignSpend platform={platform} />
       <p className="mt-3 text-xs text-gray-400">
         Avg Daily Spend Δ% = (Current MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
       </p>
