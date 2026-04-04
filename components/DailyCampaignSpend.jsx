@@ -9,20 +9,32 @@ function fmtSpend(n) {
   return '₹' + n.toFixed(0);
 }
 
-export default function DailyCampaignSpend() {
+export default function DailyCampaignSpend({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   useEffect(() => {
-    fetch('/api/daily-spend').then(r => r.json()).then(d => {
-      if (d.error) throw new Error(d.error);
-      setData(d); setLoading(false);
-    }).catch(e => { setError(e.message); setLoading(false); });
-  }, []);
+    setLoading(true);
+    setData(null);
+    setError(null);
+    const url = platform === 'zepto' ? '/api/zepto/daily-spend' : '/api/daily-spend';
+    fetch(url)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+        setLoading(false);
+      })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, [platform]);
+
   if (loading) return <div className="mt-8 p-4 border border-gray-200 rounded-xl text-sm text-gray-400 animate-pulse">Loading daily spend data…</div>;
   if (error) return <div className="mt-8 p-4 text-red-600 bg-red-50 rounded-lg text-sm">Daily spend error: {error}</div>;
   if (!data || !data.campaigns || data.campaigns.length === 0) return null;
+
   const alertCamps = data.campaigns.filter(c => c.hasAlert);
+
   return (
     <div className="mt-8">
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -31,7 +43,7 @@ export default function DailyCampaignSpend() {
       </div>
       {alertCamps.length > 0 && (
         <div className="mb-4 space-y-1.5">
-          {alertCamps.map((camp, i) => (
+          {alertCamps.map((camp) => (
             <div key={camp.campaign} className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs">
               <span className="text-red-500 shrink-0 mt-0.5">⚠</span>
               <span>
