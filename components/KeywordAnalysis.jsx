@@ -123,7 +123,9 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
             <tr className="bg-gray-800 text-white">
               <th className="px-4 py-3 text-left font-semibold w-72">Category / Campaign / Keyword</th>
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
+              <th className="px-3 py-3 text-right font-semibold text-xs">Prev Avg Daily</th>
               <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
+              <th className="px-3 py-3 text-right font-semibold text-xs">MTD Avg Daily</th>
               <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
               <th className="px-3 py-3 text-center font-semibold">Prev ROAS</th>
               <th className="px-3 py-3 text-center font-semibold">MTD ROAS</th>
@@ -148,7 +150,9 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                       <span className="text-gray-400 text-xs mr-2">{isCatExp ? '▼' : '▶'}</span>{cat}
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-500">{catPrevSpend > 0 ? fmtSpend(catPrevSpend) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-400 text-xs">{catPrevSpend > 0 && prevDays ? fmtSpend(catPrevSpend / prevDays) : '—'}</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-600 text-xs">{catSpend > 0 && currDays ? fmtSpend(catSpend / currDays) : '—'}</td>
                     {catSpendChange !== null
                       ? <td className={'px-3 py-2.5 text-center text-sm font-semibold ' + (catSpendChange > 0 ? 'text-green-700' : 'text-red-700')}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td>
                       : <td className="px-3 py-2.5 text-center text-gray-400">—</td>
@@ -177,7 +181,9 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                             )}
                           </td>
                           <td className="px-3 py-2 text-right font-semibold text-gray-500 text-sm">{campPrevSpend > 0 ? fmtSpend(campPrevSpend) : '—'}</td>
+                          <td className="px-3 py-2 text-right text-gray-400 text-xs">{campPrevSpend > 0 && prevDays ? fmtSpend(campPrevSpend / prevDays) : '—'}</td>
                           <td className="px-3 py-2 text-right font-semibold text-gray-700 text-sm">{fmtSpend(campSpend)}</td>
+                          <td className="px-3 py-2 text-right text-gray-600 text-xs">{campSpend > 0 && currDays ? fmtSpend(campSpend / currDays) : '—'}</td>
                           {campSpendChange !== null
                             ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campSpendChange > 0 ? 'text-green-700' : 'text-red-700')}>{campSpendChange > 0 ? '▲' : '▼'} {Math.abs(campSpendChange).toFixed(1)}%</td>
                             : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
@@ -190,7 +196,9 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                             <tr key={campKey + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-4 py-2 pl-14 text-gray-600 text-xs"><span className="text-gray-300 mr-2">└</span>{row.keyword}</td>
                               <td className="px-3 py-2 text-right text-gray-500 text-xs">{row.prevSpend ? fmtSpend(row.prevSpend) : '—'}</td>
+                              <td className="px-3 py-2 text-right text-gray-400 text-xs">{row.prevSpend && prevDays ? fmtSpend(row.prevSpend / prevDays) : '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-700 text-xs">{fmtSpend(row.spend)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 text-xs">{row.spend && currDays ? fmtSpend(row.spend / currDays) : '—'}</td>
                               <ChangeCell value={rowSpendChange} />
                               <RoasCell value={row.prevRoas} />
                               <RoasCell value={row.roas} />
@@ -210,7 +218,7 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
         </table>
       </div>
       <p className="mt-3 text-xs text-gray-400">
-        Avg Daily Spend Δ% = (MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
+        Avg Daily = Total Spend / Days available • Avg Daily Spend Δ% = (MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
         {hasPrev && (' • Δ% vs ' + data.prevMonthLabel)}
       </p>
     </div>
