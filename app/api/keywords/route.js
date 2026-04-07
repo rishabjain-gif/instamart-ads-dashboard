@@ -1,5 +1,6 @@
 import { SHEETS, getCurrentAndPreviousMonths } from '@/lib/config';
 import { parseCSV, aggregateRows, calcPctChange } from '@/lib/dataUtils';
+
 export const revalidate = 300;
 const _kwCache = {};
 function getCached(k) { const e = _kwCache[k]; return (e && Date.now()-e.ts < 300000) ? e.data : null; }
@@ -15,7 +16,12 @@ async function fetchSheet(url) {
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
   return parseCSV(await resp.text());
 }
-function fmtS(n) { if (!n || n === 0) return '\u20b90'; if (n >= 100000) return '\u20b9' + (n/100000).toFixed(1) + 'L'; if (n >= 1000) return '\u20b9' + (n/1000).toFixed(1) + 'K'; return '\u20b9' + n.toFixed(0); }
+function fmtS(n) {
+  if (!n || n === 0) return '\u20b90';
+  if (n >= 100000) return '\u20b9' + (n/100000).toFixed(1) + 'L';
+  if (n >= 1000) return '\u20b9' + (n/1000).toFixed(1) + 'K';
+  return '\u20b9' + n.toFixed(0);
+}
 function groupByKeyword(rows) {
   const groups = {};
   const kwRows = rows.filter(r => r['AD_PROPERTY'] === 'Keyword Based Ads');
@@ -44,7 +50,8 @@ function buildInsightText(curr, prev, campKeywords) {
   const zeroRoasKws = kws.filter(k => (k.roas === null || k.roas === 0) && k.spend > 500);
   const lowRoasKws = kws.filter(k => k.roas !== null && k.roas > 0 && k.roas < 1.5);
   const highRoasKws = kws.filter(k => k.roas !== null && k.roas >= 3).sort((a, b) => b.roas - a.roas);
-  const reasons = []; const actions = [];
+  const reasons = [];
+  const actions = [];
   if (cpcChg !== null && cpcChg > 10) {
     reasons.push('CPC rose ' + cpcChg.toFixed(0) + '%');
     if (kws.length > 0) {
@@ -53,14 +60,30 @@ function buildInsightText(curr, prev, campKeywords) {
       actions.push('Reduce bids on ' + names);
     }
   }
-  if (cvrChg !== null && cvrChg < -10) { reasons.push('CVR dropped ' + Math.abs(cvrChg).toFixed(0) + '%'); actions.push('Check product listing quality, pricing, and stock — conversion rate declined'); }
-  if (zeroRoasKws.length > 0) { const names = zeroRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + fmtS(k.spend) + ' spent, 0x ROAS)').join(', '); actions.push('Pause ' + names + ' — spending with no returns'); }
-  else if (lowRoasKws.length > 0) { const names = lowRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + k.roas.toFixed(2) + 'x)').join(', '); actions.push('Reduce budget on ' + names + ' — ROAS below break-even'); }
-  if (highRoasKws.length > 0 && spendChg < 10) { const top = highRoasKws[0]; actions.push('Increase bids on "' + top.keyword + '" — strong at ' + top.roas.toFixed(2) + 'x ROAS with budget headroom'); }
+  if (cvrChg !== null && cvrChg < -10) {
+    reasons.push('CVR dropped ' + Math.abs(cvrChg).toFixed(0) + '%');
+    actions.push('Check product listing quality, pricing, and stock — conversion rate declined');
+  }
+  if (zeroRoasKws.length > 0) {
+    const names = zeroRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + fmtS(k.spend) + ' spent, 0x ROAS)').join(', ');
+    actions.push('Pause ' + names + ' — spending with no returns');
+  } else if (lowRoasKws.length > 0) {
+    const names = lowRoasKws.slice(0, 2).map(k => '"' + k.keyword + '" (' + k.roas.toFixed(2) + 'x)').join(', ');
+    actions.push('Reduce budget on ' + names + ' — ROAS below break-even');
+  }
+  if (highRoasKws.length > 0 && spendChg < 10) {
+    const top = highRoasKws[0];
+    actions.push('Increase bids on "' + top.keyword + '" — strong at ' + top.roas.toFixed(2) + 'x ROAS with budget headroom');
+  }
   if (reasons.length === 0) reasons.push('ROAS declined month-over-month');
-  if (actions.length === 0) { actions.push(kws.length > 0 ? 'Audit keywords — worst performer: "' + kws[0].keyword + '" at ' + (kws[0].roas !== null ? kws[0].roas.toFixed(2) + 'x' : '0x') + ' ROAS' : 'Audit keyword bids and pause under-performers'); }
+  if (actions.length === 0) {
+    actions.push(kws.length > 0
+      ? 'Audit keywords — worst performer: "' + kws[0].keyword + '" at ' + (kws[0].roas !== null ? kws[0].roas.toFixed(2) + 'x' : '0x') + ' ROAS'
+      : 'Audit keyword bids and pause under-performers');
+  }
   return { reason: reasons.join('; '), action: actions.join('; '), topKeywords: kws.slice(0, 5) };
 }
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -76,22 +99,33 @@ export async function GET(request) {
     const cacheKey = key + '_' + (prevKey || '');
     const cached = getCached(cacheKey);
     if (cached) return Response.json(cached);
+
     const [currRows, prevRows] = await Promise.all([
       fetchSheet(sheet.url),
       prevSheet ? fetchSheet(prevSheet.url) : Promise.resolve([]),
     ]);
+
     const currGroups = groupByKeyword(currRows);
     const prevGroups = prevRows.length ? groupByKeyword(prevRows) : {};
-    const catTotals = {}; const campTotals = {};
+
+    const catTotals = {};
+    const campTotals = {};
     const table = [];
-    for (const [k, g] of Object.entries(currGroups)) {
-      const agg = aggregateRows(g.rows);
+
+    // Include ALL keywords from both months (so paused keywords are not skipped)
+    const allKeywordKeys = new Set([...Object.keys(currGroups), ...Object.keys(prevGroups)]);
+    for (const k of allKeywordKeys) {
+      const g = currGroups[k];
+      const prevG = prevGroups[k];
+      const agg = g ? aggregateRows(g.rows) : { spend: 0, roas: 0, cpc: 0, cvr: 0 };
+      const prevAgg = prevG ? aggregateRows(prevG.rows) : null;
       const parts = k.split('|||');
       const category = parts[0], campaign = parts[1], keyword = parts[2];
       catTotals[category] = (catTotals[category] || 0) + agg.spend;
       const ck = category + '|||' + campaign;
       campTotals[ck] = (campTotals[ck] || 0) + agg.spend;
-      const prevAgg = prevGroups[k] ? aggregateRows(prevGroups[k].rows) : null;
+      // Skip if no spend in either period
+      if (agg.spend <= 0 && (!prevAgg || prevAgg.spend <= 0)) continue;
       table.push({
         category, campaign, keyword,
         spend: agg.spend,
@@ -105,7 +139,10 @@ export async function GET(request) {
         cvrChange: (agg.cvr > 0 && prevAgg && prevAgg.cvr > 0) ? calcPctChange(agg.cvr, prevAgg.cvr) : null,
       });
     }
-    for (const row of table) { row.pctOfCat = catTotals[row.category] > 0 ? (row.spend / catTotals[row.category]) * 100 : 0; }
+
+    for (const row of table) {
+      row.pctOfCat = catTotals[row.category] > 0 ? (row.spend / catTotals[row.category]) * 100 : 0;
+    }
     table.sort((a, b) => {
       const cd = (catTotals[b.category]||0)-(catTotals[a.category]||0);
       if (cd !== 0) return cd;
@@ -115,7 +152,9 @@ export async function GET(request) {
       if (campD !== 0) return campD;
       return b.spend - a.spend;
     });
-    const campAggs = {}; const campPrevAggs = {};
+
+    const campAggs = {};
+    const campPrevAggs = {};
     for (const [k, g] of Object.entries(currGroups)) {
       const parts = k.split('|||');
       const ck = parts[0] + '|||' + parts[1];
@@ -128,6 +167,7 @@ export async function GET(request) {
       if (!campPrevAggs[ck]) campPrevAggs[ck] = { rows: [] };
       campPrevAggs[ck].rows.push(...g.rows);
     }
+
     const insights = [];
     for (const [ck, cd] of Object.entries(campAggs)) {
       const parts = ck.split('|||');
@@ -146,6 +186,7 @@ export async function GET(request) {
       insights.push({ category, campaign, spend: curr.spend, prevSpend: prev.spend, spendChange: spendChg, roas: curr.roas, prevRoas: prev.roas, roasChange: roasChg, cpc: curr.cpc, prevCpc: prev.cpc, cpcChange: cpcChg, cvr: curr.cvr, prevCvr: prev.cvr, cvrChange: cvrChg, reason, action, topKeywords });
     }
     insights.sort((a, b) => b.spend - a.spend);
+
     const strategicSuggestions = [];
     const adpropGroups = {};
     for (const row of currRows) {
@@ -170,7 +211,10 @@ export async function GET(request) {
         strategicSuggestions.push({ type: 'ad_property_winner', category: cat, priority: 'medium', title: 'Shift budget to ' + best.adProperty + ' in ' + cat, detail: best.adProperty + ' delivers ' + best.roas.toFixed(2) + 'x ROAS vs ' + worst.roas.toFixed(2) + 'x for ' + worst.adProperty + '. Reallocate spend from ' + worst.adProperty + ' (' + fmtS(worst.spend) + ') to ' + best.adProperty + ' (' + fmtS(best.spend) + ').' });
       }
     }
-    const allCampAggs = Object.entries(campAggs).map(([, cd]) => { const agg = aggregateRows(cd.rows); return { campaign: cd.campaign, category: cd.category, ...agg }; }).filter(c => c.spend > 0);
+    const allCampAggs = Object.entries(campAggs).map(([, cd]) => {
+      const agg = aggregateRows(cd.rows);
+      return { campaign: cd.campaign, category: cd.category, ...agg };
+    }).filter(c => c.spend > 0);
     if (allCampAggs.length > 1) {
       const avgSpend = allCampAggs.reduce((s, c) => s + c.spend, 0) / allCampAggs.length;
       const validCvr = allCampAggs.filter(c => c.cvr > 0);
@@ -199,11 +243,10 @@ export async function GET(request) {
       }
     }
     strategicSuggestions.sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.priority]||1) - ({ high: 0, medium: 1, low: 2 }[b.priority]||1));
+
     const availableMonths = Object.entries(SHEETS).sort((a, b) => b[0].localeCompare(a[0])).map(([k, v]) => ({ key: k, label: v.label }));
     const result = {
-      monthLabel: sheet.label,
-      monthKey: key,
-      prevMonthLabel: prevSheet ? prevSheet.label : null,
+      monthLabel: sheet.label, monthKey: key, prevMonthLabel: prevSheet ? prevSheet.label : null,
       currDays: daysElapsed(sheet.year, sheet.month),
       prevDays: prevSheet ? daysInMonth(prevSheet.year, prevSheet.month) : null,
       data: table, insights, strategicSuggestions, availableMonths
