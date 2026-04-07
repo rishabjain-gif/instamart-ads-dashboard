@@ -11,17 +11,17 @@ function fmtSpend(n) {
   return `₹${n.toFixed(0)}`;
 }
 
-function ChangeCell({ value, invert = false }) {
+function ChangeCell({ value, invert = false, bold = false }) {
   if (value === null || value === undefined) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
   const isPositive = invert ? value < 0 : value > 0;
   const color = isPositive ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
   const arrow = value > 0 ? '▲' : '▼';
-  return <td className={`px-3 py-2 text-center text-sm font-medium ${color}`}>{arrow} {Math.abs(value).toFixed(1)}%</td>;
+  return <td className={`px-3 py-2 text-center text-sm ${bold ? 'font-bold' : 'font-medium'} ${color}`}>{arrow} {Math.abs(value).toFixed(1)}%</td>;
 }
 
-function RoasCell({ value }) {
+function RoasCell({ value, bold = false }) {
   if (value === null || value === undefined || value === 0) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
-  return <td className="px-3 py-2 text-center text-sm text-gray-800">{value.toFixed(2)}x</td>;
+  return <td className={`px-3 py-2 text-center text-sm ${bold ? 'font-bold text-white' : 'text-gray-800'}`}>{value.toFixed(2)}x</td>;
 }
 
 function SpendCell({ value }) {
@@ -69,6 +69,18 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   const categories = Object.keys(byCategory);
   const toggleCat = (cat) => setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
+  // Totals
+  const totalPrevSpend = data.data.reduce((s, r) => s + (r.prevSpend || 0), 0);
+  const totalCurrentSpend = data.data.reduce((s, r) => s + (r.currentSpend || 0), 0);
+  const totalPrevGMV = data.data.reduce((s, r) => s + ((r.prevRoas || 0) * (r.prevSpend || 0)), 0);
+  const totalCurrentGMV = data.data.reduce((s, r) => s + ((r.currentRoas || 0) * (r.currentSpend || 0)), 0);
+  const totalPrevRoas = totalPrevSpend > 0 ? totalPrevGMV / totalPrevSpend : null;
+  const totalCurrentRoas = totalCurrentSpend > 0 ? totalCurrentGMV / totalCurrentSpend : null;
+  const totalPrevAvg = totalPrevSpend > 0 && data.prevDays ? totalPrevSpend / data.prevDays : null;
+  const totalCurrAvg = totalCurrentSpend > 0 && data.currDays ? totalCurrentSpend / data.currDays : null;
+  const totalSpendChange = totalPrevAvg && totalCurrAvg ? ((totalCurrAvg - totalPrevAvg) / totalPrevAvg) * 100 : null;
+  const totalRoasChange = (totalCurrentRoas && totalPrevRoas) ? ((totalCurrentRoas - totalPrevRoas) / Math.abs(totalPrevRoas)) * 100 : null;
+
   return (
     <div>
       <div className="mb-4 flex items-center gap-4 flex-wrap">
@@ -79,6 +91,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
         </div>
         <div className="text-xs text-gray-400">Sorted by spend (high to low) • Click category to collapse</div>
       </div>
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
           <thead>
@@ -135,12 +148,29 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                 </Fragment>
               );
             })}
+            <tr className="bg-gray-800 text-white">
+              <td className="px-4 py-3 font-bold text-sm">Σ Grand Total</td>
+              <td className="px-3 py-3 text-right font-bold text-sm text-gray-300">{totalPrevSpend > 0 ? fmtSpend(totalPrevSpend) : '—'}</td>
+              <td className="px-3 py-3 text-right font-bold text-sm">{fmtSpend(totalCurrentSpend)}</td>
+              {totalSpendChange !== null
+                ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalSpendChange > 0 ? '▲' : '▼'} {Math.abs(totalSpendChange).toFixed(1)}%</td>
+                : <td className="px-3 py-3 text-center text-gray-400">—</td>
+              }
+              <td className="px-3 py-3 text-center font-bold text-sm text-gray-300">{totalPrevRoas ? totalPrevRoas.toFixed(2) + 'x' : '—'}</td>
+              <td className="px-3 py-3 text-center font-bold text-sm">{totalCurrentRoas ? totalCurrentRoas.toFixed(2) + 'x' : '—'}</td>
+              {totalRoasChange !== null
+                ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalRoasChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalRoasChange > 0 ? '▲' : '▼'} {Math.abs(totalRoasChange).toFixed(1)}%</td>
+                : <td className="px-3 py-3 text-center text-gray-400">—</td>
+              }
+              <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
+              <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
+            </tr>
           </tbody>
         </table>
       </div>
       <DailyCampaignSpend platform={platform} />
       <p className="mt-3 text-xs text-gray-400">
-        Avg Daily Spend Δ% = (Current MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
+        Avg Daily Spend Δ% = (Current MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • Grand Total ROAS = spend-weighted average • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
       </p>
     </div>
   );
