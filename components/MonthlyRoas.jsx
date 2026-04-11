@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import DailyCampaignSpend from './DailyCampaignSpend';
 
 function fmtSpend(n) {
@@ -32,20 +32,36 @@ function SpendCell({ value }) {
 export default function MonthlyRoas({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [expandedCats, setExpandedCats] = useState({});
   const [expandedAdTypes, setExpandedAdTypes] = useState({});
   const [expandedBrands, setExpandedBrands] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
 
-  useEffect(() => {
-    setLoading(true); setData(null); setError(null);
-    const url = platform === 'zepto' ? '/api/zepto/monthly' : '/api/monthly';
-    fetch(url).then(r => r.json()).then(d => {
-      if (d.error) throw new Error(d.error);
-      setData(d); setLoading(false);
-    }).catch(e => { setError(e.message); setLoading(false); });
+  const fetchData = useCallback((bust = false) => {
+    const isRefresh = bust;
+    if (isRefresh) setRefreshing(true); else { setLoading(true); setData(null); setError(null); }
+    const base = platform === 'zepto' ? '/api/zepto/monthly' : '/api/monthly';
+    const url = bust ? base + '?bust=true' : base;
+    fetch(url)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error);
+        setData(d);
+        setLastUpdated(new Date());
+        setLoading(false);
+        setRefreshing(false);
+      })
+      .catch(e => {
+        setError(e.message);
+        setLoading(false);
+        setRefreshing(false);
+      });
   }, [platform]);
+
+  useEffect(() => { fetchData(false); }, [fetchData]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -69,20 +85,15 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   const totalSpendChange = totalPrevAvg && totalCurrAvg ? ((totalCurrAvg - totalPrevAvg) / totalPrevAvg) * 100 : null;
   const totalRoasChange = (totalCurrentRoas && totalPrevRoas) ? ((totalCurrentRoas - totalPrevRoas) / Math.abs(totalPrevRoas)) * 100 : null;
 
-  // Grand total row — accepts optional extra column for zepto
   const grandTotalRow = (extraCol = false) => (
     <tr className="bg-gray-800 text-white">
       <td className="px-4 py-3 font-bold text-sm">Σ Grand Total</td>
       <td className="px-3 py-3 text-right font-bold text-sm text-gray-300">{totalPrevSpend > 0 ? fmtSpend(totalPrevSpend) : '—'}</td>
       <td className="px-3 py-3 text-right font-bold text-sm">{fmtSpend(totalCurrentSpend)}</td>
-      {totalSpendChange !== null
-        ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalSpendChange > 0 ? '▲' : '▼'} {Math.abs(totalSpendChange).toFixed(1)}%</td>
-        : <td className="px-3 py-3 text-center text-gray-400">—</td>}
+      {totalSpendChange !== null ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalSpendChange > 0 ? '▲' : '▼'} {Math.abs(totalSpendChange).toFixed(1)}%</td> : <td className="px-3 py-3 text-center text-gray-400">—</td>}
       <td className="px-3 py-3 text-center font-bold text-sm text-gray-300">{totalPrevRoas ? totalPrevRoas.toFixed(2) + 'x' : '—'}</td>
       <td className="px-3 py-3 text-center font-bold text-sm">{totalCurrentRoas ? totalCurrentRoas.toFixed(2) + 'x' : '—'}</td>
-      {totalRoasChange !== null
-        ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalRoasChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalRoasChange > 0 ? '▲' : '▼'} {Math.abs(totalRoasChange).toFixed(1)}%</td>
-        : <td className="px-3 py-3 text-center text-gray-400">—</td>}
+      {totalRoasChange !== null ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalRoasChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalRoasChange > 0 ? '▲' : '▼'} {Math.abs(totalRoasChange).toFixed(1)}%</td> : <td className="px-3 py-3 text-center text-gray-400">—</td>}
       <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
       <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
       {extraCol && <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>}
@@ -96,10 +107,24 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
         <span className="font-semibold text-gray-700">{data.currentLabel} MTD</span> ({data.currDays} days elapsed)
       </div>
       <div className="text-xs text-gray-400">Sorted by spend (high to low) • Click to collapse/expand</div>
+      <div className="ml-auto flex items-center gap-3">
+        {lastUpdated && (
+          <span className="text-xs text-gray-400">
+            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+        <button
+          onClick={() => fetchData(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <span className={`inline-block ${refreshing ? 'animate-spin' : ''}`}>↻</span>
+          {refreshing ? 'Refreshing…' : 'Refresh Data'}
+        </button>
+      </div>
     </div>
   );
 
-  // tableHeader accepts optional extra column label (for zepto's % of Cat Spend)
   const tableHeader = (label, extraColLabel = null) => (
     <thead className="sticky top-0 z-10">
       <tr className="bg-gray-800 text-white">
@@ -147,22 +172,17 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                 const atCurrAvg = atCurrentSpend > 0 && data.currDays ? atCurrentSpend / data.currDays : null;
                 const atSpendChange = atPrevAvg && atCurrAvg ? ((atCurrAvg - atPrevAvg) / atPrevAvg) * 100 : null;
                 const isAtExp = expandedAdTypes[adType] !== false;
-
                 return (
                   <Fragment key={adType}>
-                    <tr className="bg-gray-800 text-white cursor-pointer hover:bg-gray-700 transition-colors"
-                        onClick={() => toggleAdType(adType)}>
+                    <tr className="bg-gray-800 text-white cursor-pointer hover:bg-gray-700 transition-colors" onClick={() => toggleAdType(adType)}>
                       <td className="px-4 py-2.5 font-bold text-sm">
                         <span className="text-gray-400 text-xs mr-1.5">{isAtExp ? '▼' : '▶'}</span>{adType}
                       </td>
                       <td className="px-3 py-2.5 text-right font-bold text-sm text-gray-300">{atPrevSpend > 0 ? fmtSpend(atPrevSpend) : '—'}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-sm">{fmtSpend(atCurrentSpend)}</td>
-                      {atSpendChange !== null
-                        ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${atSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{atSpendChange > 0 ? '▲' : '▼'} {Math.abs(atSpendChange).toFixed(1)}%</td>
-                        : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
+                      {atSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${atSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{atSpendChange > 0 ? '▲' : '▼'} {Math.abs(atSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
                       <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{brandNames.length} brand{brandNames.length !== 1 ? 's' : ''}</td>
                     </tr>
-
                     {isAtExp && brandNames.map((brand) => {
                       const catRows = brands[brand];
                       const brCurrentSpend = catRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
@@ -172,31 +192,24 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                       const brSpendChange = brPrevAvg && brCurrAvg ? ((brCurrAvg - brPrevAvg) / brPrevAvg) * 100 : null;
                       const brandKey = adType + '|||' + brand;
                       const isBrExp = expandedBrands[brandKey] !== false;
-
                       return (
                         <Fragment key={brandKey}>
-                          <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
-                              onClick={() => toggleBrand(brandKey)}>
+                          <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleBrand(brandKey)}>
                             <td className="px-4 py-2 pl-6 font-semibold text-gray-800 text-sm">
                               <span className="text-gray-400 text-xs mr-1.5">{isBrExp ? '▼' : '▶'}</span>{brand}
                             </td>
                             <td className="px-3 py-2 text-right font-semibold text-gray-500 text-sm">{brPrevSpend > 0 ? fmtSpend(brPrevSpend) : '—'}</td>
                             <td className="px-3 py-2 text-right font-semibold text-gray-700 text-sm">{fmtSpend(brCurrentSpend)}</td>
-                            {brSpendChange !== null
-                              ? <td className={`px-3 py-2 text-center text-sm font-semibold ${brSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td>
-                              : <td className="px-3 py-2 text-center text-gray-400">—</td>}
+                            {brSpendChange !== null ? <td className={`px-3 py-2 text-center text-sm font-semibold ${brSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400">—</td>}
                             <td colSpan={6} className="px-3 py-2 text-center text-gray-400 text-xs italic">{catRows.length} categor{catRows.length !== 1 ? 'ies' : 'y'}</td>
                           </tr>
-
                           {isBrExp && catRows.map((row, idx) => {
                             const catKey = brandKey + '|||' + row.category;
                             const isCatExp = expandedCategories[catKey] === true;
                             const hasKw = row.keywords && row.keywords.length > 0;
-
                             return (
                               <Fragment key={catKey + '-' + idx}>
-                                <tr
-                                  className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${hasKw ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
+                                <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${hasKw ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
                                   onClick={() => hasKw && toggleCategory(catKey)}
                                 >
                                   <td className="px-4 py-2 pl-10 text-gray-700 text-sm">
@@ -214,11 +227,8 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                                   <ChangeCell value={row.cvrChange} />
                                   <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
                                 </tr>
-
                                 {isCatExp && hasKw && row.keywords.map((kw, kwIdx) => {
-                                  const pctOfCat = row.currentSpend > 0
-                                    ? (kw.currentSpend / row.currentSpend * 100).toFixed(1) + '%'
-                                    : '—';
+                                  const pctOfCat = row.currentSpend > 0 ? (kw.currentSpend / row.currentSpend * 100).toFixed(1) + '%' : '—';
                                   return (
                                     <tr key={catKey + '-kw-' + kwIdx} className="bg-blue-50 border-l-2 border-blue-200">
                                       <td className="px-4 py-1.5 pl-14 text-gray-600 text-xs">
@@ -281,19 +291,15 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
               const catPrevAvg = catPrevSpend > 0 && data.prevDays ? catPrevSpend / data.prevDays : null;
               const catCurrAvg = catCurrentSpend > 0 && data.currDays ? catCurrentSpend / data.currDays : null;
               const catSpendChange = catPrevAvg && catCurrAvg ? ((catCurrAvg - catPrevAvg) / catPrevAvg) * 100 : null;
-
               return (
                 <Fragment key={cat}>
-                  <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
-                      onClick={() => toggleCat(cat)}>
+                  <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleCat(cat)}>
                     <td className="px-4 py-2.5 font-semibold text-gray-800">
                       <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : '▶'}</span>{cat}
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-500">{catPrevSpend > 0 ? fmtSpend(catPrevSpend) : '—'}</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catCurrentSpend)}</td>
-                    {catSpendChange !== null
-                      ? <td className={`px-3 py-2.5 text-center text-sm font-semibold ${catSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td>
-                      : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
+                    {catSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-semibold ${catSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
                     <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{rows.length} ad type{rows.length !== 1 ? 's' : ''}</td>
                   </tr>
                   {isExpanded && rows.map((row, idx) => (
