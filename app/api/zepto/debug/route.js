@@ -7,20 +7,28 @@ export async function GET() {
   const text = await resp.text();
   const rows = parseCSV(text);
 
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-  const drinkMixRows = rows.filter(r => (r['Cat'] || r['Category'] || '').includes('Drink'));
-  const kwSample = drinkMixRows.slice(0, 10).map(r => ({
-    cat: r['Cat'] || r['Category'],
+  // Find all rows with pediasure keyword
+  const pediaRows = rows.filter(r => (r['KeywordName'] || '').toLowerCase().includes('pediasure'));
+  const pediaSummary = pediaRows.map(r => ({
+    adType: r['Ad type'],
+    brand: r['BrandName'],
+    cat: r['Category'],
     kw: r['KeywordName'],
-    kwText: r['Keyword'],
     spend: r['Spend'],
-    allKeys: Object.keys(r).join('|')
   }));
 
+  // Aggregate pediasure by adType
+  const byAdType = {};
+  for (const r of pediaRows) {
+    const at = r['Ad type'] || 'unknown';
+    if (!byAdType[at]) byAdType[at] = { count: 0, totalSpend: 0 };
+    byAdType[at].count++;
+    byAdType[at].totalSpend += parseFloat(r['Spend'] || 0);
+  }
+
   return Response.json({
-    totalRows: rows.length,
-    columns,
-    drinkMixCount: drinkMixRows.length,
-    kwSample,
+    totalPediaRows: pediaRows.length,
+    byAdType,
+    sample: pediaSummary.slice(0, 20),
   });
 }
