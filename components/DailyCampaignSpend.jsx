@@ -58,9 +58,9 @@ export default function DailyCampaignSpend({ platform = 'instamart' }) {
           ))}
         </div>
       )}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-xs">
-          <thead><tr className="bg-gray-800 text-white">
+          <thead className="sticky top-0 z-10"><tr className="bg-gray-800 text-white">
             <th className="px-3 py-2.5 text-left font-semibold sticky left-0 bg-gray-800 z-10 min-w-[200px]">Campaign</th>
             {data.dateLabels.map((lbl, i) => <th key={i} className="px-2 py-2.5 text-center font-medium text-gray-300 min-w-[58px]">{lbl}</th>)}
           </tr></thead>
