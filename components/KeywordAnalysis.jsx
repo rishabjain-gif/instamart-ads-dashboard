@@ -117,9 +117,9 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
         <div className="text-xs text-gray-400 ml-auto">Keyword Based Ads only • Click to expand/collapse</div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-gray-800 text-white">
               <th className="px-4 py-3 text-left font-semibold w-72">Category / Campaign / Keyword</th>
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
