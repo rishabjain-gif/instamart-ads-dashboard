@@ -6,6 +6,7 @@ export const revalidate = 300;
 const _cache = {};
 function getCached(k) { const e = _cache[k]; return (e && Date.now()-e.ts < 300000) ? e.data : null; }
 function setCached(k, d) { _cache[k] = { data: d, ts: Date.now() }; }
+function clearCached(k) { delete _cache[k]; }
 
 function daysInMonth(year, month) { return new Date(year, month, 0).getDate(); }
 function daysElapsed(year, month) {
@@ -20,10 +21,16 @@ async function fetchSheet(url) {
   return parseCSV(await resp.text());
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const bust = searchParams.get('bust') === 'true';
+
     const { current, previous } = getZeptoCurrentAndPreviousMonths();
     const cacheKey = 'z_' + current.key + '_' + (previous ? previous.key : 'none');
+
+    if (bust) clearCached(cacheKey);
+
     const cached = getCached(cacheKey);
     if (cached) return Response.json(cached);
 
@@ -71,7 +78,6 @@ export async function GET() {
       const currAvg = curr ? curr.spend / currDays : null;
       const prevAvg = prev ? prev.spend / prevDays : null;
 
-      // Build keyword list merging current + previous month data
       const currByKw = currGroups[key]?.byKeyword || {};
       const prevByKw = prevGroups[key]?.byKeyword || {};
       const allKwNames = new Set([...Object.keys(currByKw), ...Object.keys(prevByKw)]);
@@ -89,9 +95,7 @@ export async function GET() {
       }).sort((a, b) => b.currentSpend - a.currentSpend);
 
       results.push({
-        adType,
-        brand,
-        category,
+        adType, brand, category,
         currentSpend: curr?.spend ?? 0,
         prevSpend: prev?.spend ?? null,
         avgDailySpendChange: currAvg !== null && prevAvg ? calcPctChange(currAvg, prevAvg) : null,
@@ -111,7 +115,6 @@ export async function GET() {
       const bk = r.adType + '|||' + r.brand;
       brandSpend[bk] = (brandSpend[bk] || 0) + r.currentSpend;
     }
-
     results.sort((a, b) => {
       const ad = (adTypeSpend[b.adType] || 0) - (adTypeSpend[a.adType] || 0);
       if (ad !== 0) return ad;
@@ -127,9 +130,9 @@ export async function GET() {
       previousLabel: previous?.label ?? null,
       currDays,
       prevDays,
+      fetchedAt: new Date().toISOString(),
       data: results
     };
-
     setCached(cacheKey, result);
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
