@@ -94,9 +94,9 @@ function StrategicSuggestions({ suggestions }) {
   return (
     <div className="mt-8">
       <h3 className="text-base font-semibold text-gray-800 mb-3">Strategic Suggestions</h3>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-gray-800 text-white">
               <th className="px-3 py-3 text-center font-semibold w-8"></th>
               <th className="px-4 py-3 text-left font-semibold">Type</th>
