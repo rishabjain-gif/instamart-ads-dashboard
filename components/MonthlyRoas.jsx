@@ -33,19 +33,18 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Instamart: 2-level expand
   const [expandedCats, setExpandedCats] = useState({});
-  // Zepto: 3-level expand
   const [expandedAdTypes, setExpandedAdTypes] = useState({});
   const [expandedBrands, setExpandedBrands] = useState({});
+  const [expandedCategories, setExpandedCategories] = useState({});
 
   useEffect(() => {
     setLoading(true); setData(null); setError(null);
     const url = platform === 'zepto' ? '/api/zepto/monthly' : '/api/monthly';
-    fetch(url)
-      .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setData(d); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
+    fetch(url).then(r => r.json()).then(d => {
+      if (d.error) throw new Error(d.error);
+      setData(d); setLoading(false);
+    }).catch(e => { setError(e.message); setLoading(false); });
   }, [platform]);
 
   if (loading) return (
@@ -59,7 +58,6 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   if (error) return <div className="p-6 text-red-600 bg-red-50 rounded-lg">Error: {error}</div>;
   if (!data || !Array.isArray(data.data)) return null;
 
-  // Grand totals
   const totalPrevSpend = data.data.reduce((s, r) => s + (r.prevSpend || 0), 0);
   const totalCurrentSpend = data.data.reduce((s, r) => s + (r.currentSpend || 0), 0);
   const totalPrevGMV = data.data.reduce((s, r) => s + ((r.prevRoas || 0) * (r.prevSpend || 0)), 0);
@@ -76,14 +74,10 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
       <td className="px-4 py-3 font-bold text-sm">Σ Grand Total</td>
       <td className="px-3 py-3 text-right font-bold text-sm text-gray-300">{totalPrevSpend > 0 ? fmtSpend(totalPrevSpend) : '—'}</td>
       <td className="px-3 py-3 text-right font-bold text-sm">{fmtSpend(totalCurrentSpend)}</td>
-      {totalSpendChange !== null
-        ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalSpendChange > 0 ? '▲' : '▼'} {Math.abs(totalSpendChange).toFixed(1)}%</td>
-        : <td className="px-3 py-3 text-center text-gray-400">—</td>}
+      {totalSpendChange !== null ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalSpendChange > 0 ? '▲' : '▼'} {Math.abs(totalSpendChange).toFixed(1)}%</td> : <td className="px-3 py-3 text-center text-gray-400">—</td>}
       <td className="px-3 py-3 text-center font-bold text-sm text-gray-300">{totalPrevRoas ? totalPrevRoas.toFixed(2) + 'x' : '—'}</td>
       <td className="px-3 py-3 text-center font-bold text-sm">{totalCurrentRoas ? totalCurrentRoas.toFixed(2) + 'x' : '—'}</td>
-      {totalRoasChange !== null
-        ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalRoasChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalRoasChange > 0 ? '▲' : '▼'} {Math.abs(totalRoasChange).toFixed(1)}%</td>
-        : <td className="px-3 py-3 text-center text-gray-400">—</td>}
+      {totalRoasChange !== null ? <td className={`px-3 py-3 text-center text-sm font-bold ${totalRoasChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{totalRoasChange > 0 ? '▲' : '▼'} {Math.abs(totalRoasChange).toFixed(1)}%</td> : <td className="px-3 py-3 text-center text-gray-400">—</td>}
       <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
       <td className="px-3 py-3 text-center text-gray-400 text-sm">—</td>
     </tr>
@@ -92,15 +86,30 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   const metaLine = (
     <div className="mb-4 flex items-center gap-4 flex-wrap">
       <div className="text-sm text-gray-500">
-        Comparing <span className="font-semibold text-gray-700">{data.previousLabel || 'Previous Month'}</span> ({data.prevDays} days)
-        {' '}vs{' '}
+        Comparing <span className="font-semibold text-gray-700">{data.previousLabel || 'Previous Month'}</span> ({data.prevDays} days){' '}vs{' '}
         <span className="font-semibold text-gray-700">{data.currentLabel} MTD</span> ({data.currDays} days elapsed)
       </div>
       <div className="text-xs text-gray-400">Sorted by spend (high to low) • Click to collapse/expand</div>
     </div>
   );
 
-  // ── ZEPTO: 3-level (Ad Type → Brand → Category) ──
+  const tableHeader = (label) => (
+    <thead className="sticky top-0 z-10">
+      <tr className="bg-gray-800 text-white">
+        <th className="px-4 py-3 text-left font-semibold w-64">{label}</th>
+        <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
+        <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
+        <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
+        <th className="px-3 py-3 text-center font-semibold">Prev ROAS</th>
+        <th className="px-3 py-3 text-center font-semibold">MTD ROAS</th>
+        <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
+        <th className="px-3 py-3 text-center font-semibold">CPC Δ%<br/><span className="font-normal text-gray-400 text-xs">(↑ bad)</span></th>
+        <th className="px-3 py-3 text-center font-semibold">CVR Δ%<br/><span className="font-normal text-gray-400 text-xs">(↓ bad)</span></th>
+      </tr>
+    </thead>
+  );
+
+  // ── ZEPTO: 4-level (Ad Type → Brand → Category → Keyword) ──
   if (platform === 'zepto') {
     const byAdType = {};
     for (const row of data.data) {
@@ -111,25 +120,14 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
     const adTypes = Object.keys(byAdType);
     const toggleAdType = (at) => setExpandedAdTypes(prev => ({ ...prev, [at]: !prev[at] }));
     const toggleBrand = (key) => setExpandedBrands(prev => ({ ...prev, [key]: !prev[key] }));
+    const toggleCategory = (key) => setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }));
 
     return (
       <div>
         {metaLine}
         <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="bg-gray-800 text-white">
-                <th className="px-4 py-3 text-left font-semibold w-64">Ad Type / Brand / Category</th>
-                <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
-                <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
-                <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
-                <th className="px-3 py-3 text-center font-semibold">Prev ROAS</th>
-                <th className="px-3 py-3 text-center font-semibold">MTD ROAS</th>
-                <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
-                <th className="px-3 py-3 text-center font-semibold">CPC Δ%<br/><span className="font-normal text-gray-400 text-xs">(↑ bad)</span></th>
-                <th className="px-3 py-3 text-center font-semibold">CVR Δ%<br/><span className="font-normal text-gray-400 text-xs">(↓ bad)</span></th>
-              </tr>
-            </thead>
+            {tableHeader('Ad Type / Brand / Category / Keyword')}
             <tbody>
               {adTypes.map((adType) => {
                 const brands = byAdType[adType];
@@ -146,15 +144,14 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                     {/* Ad Type row */}
                     <tr className="bg-gray-800 text-white cursor-pointer hover:bg-gray-700 transition-colors" onClick={() => toggleAdType(adType)}>
                       <td className="px-4 py-2.5 font-bold text-sm">
-                        <span className="text-gray-400 text-xs mr-2">{isAtExp ? '▼' : '▶'}</span>{adType}
+                        <span className="text-gray-400 text-xs mr-1.5">{isAtExp ? '▼' : '▶'}</span>{adType}
                       </td>
                       <td className="px-3 py-2.5 text-right font-bold text-sm text-gray-300">{atPrevSpend > 0 ? fmtSpend(atPrevSpend) : '—'}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-sm">{fmtSpend(atCurrentSpend)}</td>
-                      {atSpendChange !== null
-                        ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${atSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{atSpendChange > 0 ? '▲' : '▼'} {Math.abs(atSpendChange).toFixed(1)}%</td>
-                        : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
+                      {atSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${atSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{atSpendChange > 0 ? '▲' : '▼'} {Math.abs(atSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
                       <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{brandNames.length} brand{brandNames.length !== 1 ? 's' : ''}</td>
                     </tr>
+
                     {isAtExp && brandNames.map((brand) => {
                       const catRows = brands[brand];
                       const brCurrentSpend = catRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
@@ -168,29 +165,60 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                         <Fragment key={brandKey}>
                           {/* Brand row */}
                           <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleBrand(brandKey)}>
-                            <td className="px-4 py-2.5 pl-8 font-semibold text-gray-800">
-                              <span className="text-gray-400 text-xs mr-2">{isBrExp ? '▼' : '▶'}</span>{brand}
+                            <td className="px-4 py-2 pl-6 font-semibold text-gray-800 text-sm">
+                              <span className="text-gray-400 text-xs mr-1.5">{isBrExp ? '▼' : '▶'}</span>{brand}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-semibold text-gray-500">{brPrevSpend > 0 ? fmtSpend(brPrevSpend) : '—'}</td>
-                            <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(brCurrentSpend)}</td>
-                            {brSpendChange !== null
-                              ? <td className={`px-3 py-2.5 text-center text-sm font-semibold ${brSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td>
-                              : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
-                            <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{catRows.length} categor{catRows.length !== 1 ? 'ies' : 'y'}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-500 text-sm">{brPrevSpend > 0 ? fmtSpend(brPrevSpend) : '—'}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-700 text-sm">{fmtSpend(brCurrentSpend)}</td>
+                            {brSpendChange !== null ? <td className={`px-3 py-2 text-center text-sm font-semibold ${brSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400">—</td>}
+                            <td colSpan={5} className="px-3 py-2 text-center text-gray-400 text-xs italic">{catRows.length} categor{catRows.length !== 1 ? 'ies' : 'y'}</td>
                           </tr>
-                          {isBrExp && catRows.map((row, idx) => (
-                            <tr key={brandKey + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2.5 pl-14 text-gray-700"><span className="text-gray-400 mr-2">└</span>{row.category}</td>
-                              <SpendCell value={row.prevSpend} />
-                              <td className="px-3 py-2.5 text-right text-gray-700">{fmtSpend(row.currentSpend)}</td>
-                              <ChangeCell value={row.avgDailySpendChange} />
-                              <RoasCell value={row.prevRoas} />
-                              <RoasCell value={row.currentRoas} />
-                              <ChangeCell value={row.roasChange} />
-                              <ChangeCell value={row.cpcChange} invert={true} />
-                              <ChangeCell value={row.cvrChange} />
-                            </tr>
-                          ))}
+
+                          {isBrExp && catRows.map((row, idx) => {
+                            const catKey = brandKey + '|||' + row.category;
+                            const isCatExp = expandedCategories[catKey] === true;
+                            const hasKw = row.keywords && row.keywords.length > 0;
+                            return (
+                              <Fragment key={catKey + '-' + idx}>
+                                {/* Category row */}
+                                <tr
+                                  className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${hasKw ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
+                                  onClick={() => hasKw && toggleCategory(catKey)}
+                                >
+                                  <td className="px-4 py-2 pl-10 text-gray-700 text-sm">
+                                    {hasKw && <span className="text-gray-400 text-xs mr-1">{isCatExp ? '▼' : '▶'}</span>}
+                                    {!hasKw && <span className="text-gray-300 mr-1">└</span>}
+                                    {row.category}
+                                  </td>
+                                  <SpendCell value={row.prevSpend} />
+                                  <td className="px-3 py-2 text-right text-gray-700 text-sm">{fmtSpend(row.currentSpend)}</td>
+                                  <ChangeCell value={row.avgDailySpendChange} />
+                                  <RoasCell value={row.prevRoas} />
+                                  <RoasCell value={row.currentRoas} />
+                                  <ChangeCell value={row.roasChange} />
+                                  <ChangeCell value={row.cpcChange} invert={true} />
+                                  <ChangeCell value={row.cvrChange} />
+                                </tr>
+
+                                {/* Keyword rows */}
+                                {isCatExp && hasKw && row.keywords.map((kw, kwIdx) => (
+                                  <tr key={catKey + '-kw-' + kwIdx} className="bg-blue-50 border-l-2 border-blue-200">
+                                    <td className="px-4 py-1.5 pl-14 text-gray-600 text-xs">
+                                      <span className="text-blue-300 mr-1">└</span>{kw.keyword}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-gray-400 text-xs">—</td>
+                                    <td className="px-3 py-1.5 text-right text-gray-700 text-xs font-medium">{fmtSpend(kw.currentSpend)}</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-400 text-xs">—</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-400 text-xs">—</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-700 text-xs">{kw.currentRoas ? kw.currentRoas.toFixed(2) + 'x' : '—'}</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-400 text-xs">—</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-400 text-xs">—</td>
+                                    <td className="px-3 py-1.5 text-center text-gray-400 text-xs">—</td>
+                                  </tr>
+                                ))}
+                              </Fragment>
+                            );
+                          })}
                         </Fragment>
                       );
                     })}
@@ -223,19 +251,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
       {metaLine}
       <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-gray-800 text-white">
-              <th className="px-4 py-3 text-left font-semibold w-56">Category / Ad Property</th>
-              <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
-              <th className="px-3 py-3 text-right font-semibold">Spend (MTD)</th>
-              <th className="px-3 py-3 text-center font-semibold">Avg Daily Spend Δ%<br/><span className="font-normal text-gray-400 text-xs">(vs prev month)</span></th>
-              <th className="px-3 py-3 text-center font-semibold">Prev ROAS</th>
-              <th className="px-3 py-3 text-center font-semibold">MTD ROAS</th>
-              <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
-              <th className="px-3 py-3 text-center font-semibold">CPC Δ%<br/><span className="font-normal text-gray-400 text-xs">(↑ bad)</span></th>
-              <th className="px-3 py-3 text-center font-semibold">CVR Δ%<br/><span className="font-normal text-gray-400 text-xs">(↓ bad)</span></th>
-            </tr>
-          </thead>
+          {tableHeader('Category / Ad Property')}
           <tbody>
             {categories.map((cat) => {
               const rows = byCategory[cat];
@@ -253,9 +269,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-500">{catPrevSpend > 0 ? fmtSpend(catPrevSpend) : '—'}</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catCurrentSpend)}</td>
-                    {catSpendChange !== null
-                      ? <td className={`px-3 py-2.5 text-center text-sm font-semibold ${catSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td>
-                      : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
+                    {catSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-semibold ${catSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
                     <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{rows.length} ad type{rows.length !== 1 ? 's' : ''}</td>
                   </tr>
                   {isExpanded && rows.map((row, idx) => (
