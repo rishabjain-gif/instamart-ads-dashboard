@@ -6,11 +6,21 @@ export async function GET() {
   const resp = await fetch(sheet.url);
   const text = await resp.text();
   const rows = parseCSV(text);
-  const adTypeValues = [...new Set(rows.map(r => r['Ad type'] || '(empty)'))];
-  const sample = rows.slice(0, 5).map(r => ({ adType: r['Ad type'], brand: r['BrandName'], cat: r['Category'] }));
+
+  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const drinkMixRows = rows.filter(r => (r['Cat'] || r['Category'] || '').includes('Drink'));
+  const kwSample = drinkMixRows.slice(0, 10).map(r => ({
+    cat: r['Cat'] || r['Category'],
+    kw: r['KeywordName'],
+    kwText: r['Keyword'],
+    spend: r['Spend'],
+    allKeys: Object.keys(r).join('|')
+  }));
+
   return Response.json({
     totalRows: rows.length,
-    uniqueAdTypes: adTypeValues,
-    sample,
+    columns,
+    drinkMixCount: drinkMixRows.length,
+    kwSample,
   });
 }
