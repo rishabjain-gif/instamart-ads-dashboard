@@ -160,9 +160,9 @@ export default function PeriodComparison({ platform = 'instamart' }) {
           <div>
             <h3 className="font-semibold text-gray-800 mb-3">Category â Ad Property Breakdown</h3>
             <p className="text-xs text-gray-500 mb-3">ROAS Î% = change from Period A to Period B. Red = deterioration.</p>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+            <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-800 text-white">
                     {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-64">Category / Brand</th> : <th className="px-4 py-3 text-left font-semibold w-64">Category / Ad Property</th>}
                     <th className="px-3 py-3 text-right font-semibold">Spend A</th>
@@ -209,9 +209,9 @@ export default function PeriodComparison({ platform = 'instamart' }) {
           <div>
             <h3 className="font-semibold text-gray-800 mb-1">Category â Campaign â Keyword Breakdown</h3>
             <p className="text-xs text-gray-500 mb-3">Keyword Based Ads only â¢ % of Category Spend based on Period A â¢ Sorted by spend</p>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+            <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-800 text-white">
                     <th className="px-4 py-3 text-left font-semibold w-72">Category / Campaign / Keyword</th>
                     <th className="px-3 py-3 text-right font-semibold">Spend A</th>
