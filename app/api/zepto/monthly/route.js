@@ -46,7 +46,7 @@ export async function GET() {
     function groupRows(rows) {
       const groups = {};
       for (const row of rows) {
-        const adType = (row['Ad Type'] || 'Unknown').trim();
+        const adType = (row['Ad type'] || 'Unknown').trim();
         const brand = normalizeBrand(row['BrandName']);
         const cat = (row['Cat'] || row['Category'] || 'Unknown').trim();
         const key = adType + '|||' + brand + '|||' + cat;
