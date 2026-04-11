@@ -112,7 +112,7 @@ export async function GET() {
     return new Response(JSON.stringify(result), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=300, stale-while-revalidate=86400'
+        'Cache-Control': 'no-store'
       }
     });
   } catch (err) {
