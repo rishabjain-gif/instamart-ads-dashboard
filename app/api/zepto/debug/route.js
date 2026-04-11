@@ -5,13 +5,12 @@ export async function GET() {
   const sheet = ZEPTO_SHEETS['2026-04'];
   const resp = await fetch(sheet.url);
   const text = await resp.text();
-  const lines = text.split('\n').filter(l => l.trim());
-  const firstLine = lines[0];
   const rows = parseCSV(text);
-  const firstRow = rows[0] || {};
+  const adTypeValues = [...new Set(rows.map(r => r['Ad type'] || '(empty)'))];
+  const sample = rows.slice(0, 5).map(r => ({ adType: r['Ad type'], brand: r['BrandName'], cat: r['Category'] }));
   return Response.json({
-    rawFirstLine: firstLine,
-    headers: Object.keys(firstRow),
-    firstRow,
+    totalRows: rows.length,
+    uniqueAdTypes: adTypeValues,
+    sample,
   });
 }
