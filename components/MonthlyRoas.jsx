@@ -92,9 +92,9 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
         <div className="text-xs text-gray-400">Sorted by spend (high to low) • Click category to collapse</div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-gray-800 text-white">
               {platform === 'zepto'
                 ? <th className="px-4 py-3 text-left font-semibold w-56">Brand / Category</th>
