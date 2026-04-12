@@ -256,7 +256,7 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                                   return (
                                     <tr key={adTypeKey + '-kw-' + kwIdx} className="bg-blue-50 border-l-2 border-blue-200">
                                       <td className="px-4 py-1.5 pl-14 text-gray-600 text-xs">
-                                        <span className="text-blue-300 mr-1">└</span>{kw.keyword}
+                                        <span className="text-blue-300 mr-1">└</span>{kw.keyword}{kw.currentSpend === 0 && kw.prevSpend > 0 && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full font-medium">⏸ Paused</span>}
                                       </td>
                                       <td className="px-3 py-1.5 text-right text-gray-600 text-xs">{kw.prevSpend ? fmtSpend(kw.prevSpend) : '—'}</td>
                                       <td className="px-3 py-1.5 text-right text-gray-700 text-xs font-medium">{fmtSpend(kw.currentSpend)}</td>
