@@ -36,9 +36,9 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [expandedCats, setExpandedCats] = useState({});
-  const [expandedAdTypes, setExpandedAdTypes] = useState({});
   const [expandedBrands, setExpandedBrands] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [expandedAdTypes, setExpandedAdTypes] = useState({});
 
   const fetchData = useCallback((bust = false) => {
     const isRefresh = bust;
@@ -142,80 +142,103 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
     </thead>
   );
 
-  // ── ZEPTO: 4-level (Ad Type → Brand → Category → Keyword) ──
+  // ── ZEPTO: 4-level (Brand → Category → Ad Type → Keyword) ──
   if (platform === 'zepto') {
-    const byAdType = {};
+    // Build brand → category → [adType rows]
+    const byBrand = {};
     for (const row of data.data) {
-      if (!byAdType[row.adType]) byAdType[row.adType] = {};
-      if (!byAdType[row.adType][row.brand]) byAdType[row.adType][row.brand] = [];
-      byAdType[row.adType][row.brand].push(row);
+      if (!byBrand[row.brand]) byBrand[row.brand] = {};
+      if (!byBrand[row.brand][row.category]) byBrand[row.brand][row.category] = [];
+      byBrand[row.brand][row.category].push(row);
     }
-    const adTypes = Object.keys(byAdType);
-    const toggleAdType = (at) => setExpandedAdTypes(prev => ({ ...prev, [at]: !prev[at] }));
-    const toggleBrand = (key) => setExpandedBrands(prev => ({ ...prev, [key]: !prev[key] }));
+
+    // Sort brands by total current spend desc
+    const brandNames = Object.keys(byBrand).sort((a, b) => {
+      const aS = Object.values(byBrand[a]).flat().reduce((s, r) => s + (r.currentSpend || 0), 0);
+      const bS = Object.values(byBrand[b]).flat().reduce((s, r) => s + (r.currentSpend || 0), 0);
+      return bS - aS;
+    });
+
+    const toggleBrand = (brand) => setExpandedBrands(prev => ({ ...prev, [brand]: !prev[brand] }));
     const toggleCategory = (key) => setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }));
+    const toggleAdType = (key) => setExpandedAdTypes(prev => ({ ...prev, [key]: !prev[key] }));
 
     return (
       <div>
         {metaLine}
         <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
           <table className="min-w-full text-sm">
-            {tableHeader('Ad Type / Brand / Category / Keyword', '% of Cat Spend')}
+            {tableHeader('Brand / Category / Ad Type / Keyword', '% of Cat Spend')}
             <tbody>
-              {adTypes.map((adType) => {
-                const brands = byAdType[adType];
-                const brandNames = Object.keys(brands);
-                const allRows = brandNames.flatMap(b => brands[b]);
-                const atCurrentSpend = allRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
-                const atPrevSpend = allRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
-                const atPrevAvg = atPrevSpend > 0 && data.prevDays ? atPrevSpend / data.prevDays : null;
-                const atCurrAvg = atCurrentSpend > 0 && data.currDays ? atCurrentSpend / data.currDays : null;
-                const atSpendChange = atPrevAvg && atCurrAvg ? ((atCurrAvg - atPrevAvg) / atPrevAvg) * 100 : null;
-                const isAtExp = expandedAdTypes[adType] !== false;
+              {brandNames.map((brand) => {
+                const catMap = byBrand[brand];
+                const allBrandRows = Object.values(catMap).flat();
+                const brCurrentSpend = allBrandRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
+                const brPrevSpend = allBrandRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
+                const brPrevAvg = brPrevSpend > 0 && data.prevDays ? brPrevSpend / data.prevDays : null;
+                const brCurrAvg = brCurrentSpend > 0 && data.currDays ? brCurrentSpend / data.currDays : null;
+                const brSpendChange = brPrevAvg && brCurrAvg ? ((brCurrAvg - brPrevAvg) / brPrevAvg) * 100 : null;
+                const isBrExp = expandedBrands[brand] !== false;
+
+                // Sort categories within brand by spend desc
+                const catNames = Object.keys(catMap).sort((a, b) => {
+                  const aS = catMap[a].reduce((s, r) => s + (r.currentSpend || 0), 0);
+                  const bS = catMap[b].reduce((s, r) => s + (r.currentSpend || 0), 0);
+                  return bS - aS;
+                });
+
                 return (
-                  <Fragment key={adType}>
-                    <tr className="bg-gray-800 text-white cursor-pointer hover:bg-gray-700 transition-colors" onClick={() => toggleAdType(adType)}>
+                  <Fragment key={brand}>
+                    {/* Brand row — dark header */}
+                    <tr className="bg-gray-800 text-white cursor-pointer hover:bg-gray-700 transition-colors" onClick={() => toggleBrand(brand)}>
                       <td className="px-4 py-2.5 font-bold text-sm">
-                        <span className="text-gray-400 text-xs mr-1.5">{isAtExp ? '▼' : '▶'}</span>{adType}
+                        <span className="text-gray-400 text-xs mr-1.5">{isBrExp ? '▼' : '▶'}</span>{brand}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-sm text-gray-300">{atPrevSpend > 0 ? fmtSpend(atPrevSpend) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right font-bold text-sm">{fmtSpend(atCurrentSpend)}</td>
-                      {atSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${atSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{atSpendChange > 0 ? '▲' : '▼'} {Math.abs(atSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
-                      <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{brandNames.length} brand{brandNames.length !== 1 ? 's' : ''}</td>
+                      <td className="px-3 py-2.5 text-right font-bold text-sm text-gray-300">{brPrevSpend > 0 ? fmtSpend(brPrevSpend) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right font-bold text-sm">{fmtSpend(brCurrentSpend)}</td>
+                      {brSpendChange !== null ? <td className={`px-3 py-2.5 text-center text-sm font-bold ${brSpendChange > 0 ? 'text-green-400' : 'text-red-400'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2.5 text-center text-gray-400">—</td>}
+                      <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{catNames.length} categor{catNames.length !== 1 ? 'ies' : 'y'}</td>
                     </tr>
-                    {isAtExp && brandNames.map((brand) => {
-                      const catRows = brands[brand];
-                      const brCurrentSpend = catRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
-                      const brPrevSpend = catRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
-                      const brPrevAvg = brPrevSpend > 0 && data.prevDays ? brPrevSpend / data.prevDays : null;
-                      const brCurrAvg = brCurrentSpend > 0 && data.currDays ? brCurrentSpend / data.currDays : null;
-                      const brSpendChange = brPrevAvg && brCurrAvg ? ((brCurrAvg - brPrevAvg) / brPrevAvg) * 100 : null;
-                      const brandKey = adType + '|||' + brand;
-                      const isBrExp = expandedBrands[brandKey] !== false;
+
+                    {isBrExp && catNames.map((category) => {
+                      const adTypeRows = catMap[category].sort((a, b) => b.currentSpend - a.currentSpend);
+                      const catCurrentSpend = adTypeRows.reduce((s, r) => s + (r.currentSpend || 0), 0);
+                      const catPrevSpend = adTypeRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
+                      const catPrevAvg = catPrevSpend > 0 && data.prevDays ? catPrevSpend / data.prevDays : null;
+                      const catCurrAvg = catCurrentSpend > 0 && data.currDays ? catCurrentSpend / data.currDays : null;
+                      const catSpendChange = catPrevAvg && catCurrAvg ? ((catCurrAvg - catPrevAvg) / catPrevAvg) * 100 : null;
+                      const catKey = brand + '|||' + category;
+                      const isCatExp = expandedCategories[catKey] !== false;
+
                       return (
-                        <Fragment key={brandKey}>
-                          <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleBrand(brandKey)}>
+                        <Fragment key={catKey}>
+                          {/* Category row — light gray */}
+                          <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleCategory(catKey)}>
                             <td className="px-4 py-2 pl-6 font-semibold text-gray-800 text-sm">
-                              <span className="text-gray-400 text-xs mr-1.5">{isBrExp ? '▼' : '▶'}</span>{brand}
+                              <span className="text-gray-400 text-xs mr-1.5">{isCatExp ? '▼' : '▶'}</span>{category}
                             </td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-500 text-sm">{brPrevSpend > 0 ? fmtSpend(brPrevSpend) : '—'}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-700 text-sm">{fmtSpend(brCurrentSpend)}</td>
-                            {brSpendChange !== null ? <td className={`px-3 py-2 text-center text-sm font-semibold ${brSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{brSpendChange > 0 ? '▲' : '▼'} {Math.abs(brSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400">—</td>}
-                            <td colSpan={6} className="px-3 py-2 text-center text-gray-400 text-xs italic">{catRows.length} categor{catRows.length !== 1 ? 'ies' : 'y'}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-500 text-sm">{catPrevSpend > 0 ? fmtSpend(catPrevSpend) : '—'}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-700 text-sm">{fmtSpend(catCurrentSpend)}</td>
+                            {catSpendChange !== null ? <td className={`px-3 py-2 text-center text-sm font-semibold ${catSpendChange > 0 ? 'text-green-700' : 'text-red-700'}`}>{catSpendChange > 0 ? '▲' : '▼'} {Math.abs(catSpendChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400">—</td>}
+                            <td colSpan={6} className="px-3 py-2 text-center text-gray-400 text-xs italic">{adTypeRows.length} ad type{adTypeRows.length !== 1 ? 's' : ''}</td>
                           </tr>
-                          {isBrExp && catRows.map((row, idx) => {
-                            const catKey = brandKey + '|||' + row.category;
-                            const isCatExp = expandedCategories[catKey] === true;
+
+                          {isCatExp && adTypeRows.map((row, idx) => {
+                            const adTypeKey = catKey + '|||' + row.adType;
+                            const isAtExp = expandedAdTypes[adTypeKey] === true;
                             const hasKw = row.keywords && row.keywords.length > 0;
+
                             return (
-                              <Fragment key={catKey + '-' + idx}>
-                                <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${hasKw ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
-                                  onClick={() => hasKw && toggleCategory(catKey)}
+                              <Fragment key={adTypeKey + '-' + idx}>
+                                {/* Ad Type row — white/striped */}
+                                <tr
+                                  className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${hasKw ? 'cursor-pointer hover:bg-blue-50' : ''} transition-colors`}
+                                  onClick={() => hasKw && toggleAdType(adTypeKey)}
                                 >
                                   <td className="px-4 py-2 pl-10 text-gray-700 text-sm">
-                                    {hasKw && <span className="text-gray-400 text-xs mr-1">{isCatExp ? '▼' : '▶'}</span>}
+                                    {hasKw && <span className="text-gray-400 text-xs mr-1">{isAtExp ? '▼' : '▶'}</span>}
                                     {!hasKw && <span className="text-gray-300 mr-1">└</span>}
-                                    {row.category}
+                                    {row.adType}
                                   </td>
                                   <SpendCell value={row.prevSpend} />
                                   <td className="px-3 py-2 text-right text-gray-700 text-sm">{fmtSpend(row.currentSpend)}</td>
@@ -227,10 +250,11 @@ export default function MonthlyRoas({ platform = 'instamart' }) {
                                   <ChangeCell value={row.cvrChange} />
                                   <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
                                 </tr>
-                                {isCatExp && hasKw && row.keywords.map((kw, kwIdx) => {
-                                  const pctOfCat = row.currentSpend > 0 ? (kw.currentSpend / row.currentSpend * 100).toFixed(1) + '%' : '—';
+
+                                {isAtExp && hasKw && row.keywords.map((kw, kwIdx) => {
+                                  const pctOfCat = catCurrentSpend > 0 ? (kw.currentSpend / catCurrentSpend * 100).toFixed(1) + '%' : '—';
                                   return (
-                                    <tr key={catKey + '-kw-' + kwIdx} className="bg-blue-50 border-l-2 border-blue-200">
+                                    <tr key={adTypeKey + '-kw-' + kwIdx} className="bg-blue-50 border-l-2 border-blue-200">
                                       <td className="px-4 py-1.5 pl-14 text-gray-600 text-xs">
                                         <span className="text-blue-300 mr-1">└</span>{kw.keyword}
                                       </td>
