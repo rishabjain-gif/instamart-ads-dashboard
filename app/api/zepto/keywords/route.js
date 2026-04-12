@@ -117,6 +117,8 @@ export async function GET(request) {
       const g = currGroups[k];
       const prevG = prevGroups[k];
       const agg = g ? aggregateZeptoRows(g.rows) : { spend: 0, roas: 0, cpc: 0, cvr: 0 };
+      const recentDates = g ? [...new Set(g.rows.map(r => r['Date']).filter(Boolean))].sort().slice(-2) : [];
+      const recentSpend = recentDates.length > 0 ? aggregateZeptoRows(g.rows.filter(r => recentDates.includes(r['Date']))).spend : 0;
       const prevAgg = prevG ? aggregateZeptoRows(prevG.rows) : null;
       const parts = k.split('|||');
       const category = parts[0], campaign = parts[1], keyword = parts[2];
@@ -128,6 +130,7 @@ export async function GET(request) {
       table.push({
         category, campaign, keyword,
         spend: agg.spend,
+        recentSpend,
         prevSpend: prevAgg ? prevAgg.spend : null,
         roas: agg.roas > 0 ? agg.roas : null,
         cpc: agg.cpc > 0 ? agg.cpc : null,
