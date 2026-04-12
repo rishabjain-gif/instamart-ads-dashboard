@@ -194,7 +194,7 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                           const rowSpendChange = avgSpendChange(row.spend, row.prevSpend, currDays, prevDays);
                           return (
                             <tr key={campKey + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2 pl-14 text-gray-600 text-xs"><span className="text-gray-300 mr-2">└</span>{row.keyword}{row.spend === 0 && row.prevSpend > 0 && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full font-medium">⏸ Paused</span>}</td>
+                              <td className="px-4 py-2 pl-14 text-gray-600 text-xs"><span className="text-gray-300 mr-2">└</span>{row.keyword}{((row.spend === 0 && row.prevSpend > 0) || (row.recentSpend === 0 && row.spend > 0)) && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full font-medium">⏸ Paused</span>}</td>
                               <td className="px-3 py-2 text-right text-gray-500 text-xs">{row.prevSpend ? fmtSpend(row.prevSpend) : '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-400 text-xs">{row.prevSpend && prevDays ? fmtSpend(row.prevSpend / prevDays) : '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-700 text-xs">{fmtSpend(row.spend)}</td>
