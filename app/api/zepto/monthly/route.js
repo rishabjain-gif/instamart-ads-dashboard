@@ -84,10 +84,13 @@ export async function GET(request) {
 
       const keywords = Array.from(allKwNames).map(keyword => {
         const kwAgg = currByKw[keyword] ? aggregateZeptoRows(currByKw[keyword]) : null;
+          const kwRecentDates = currByKw[keyword] ? [...new Set(currByKw[keyword].map(r => r['Date']).filter(Boolean))].sort().slice(-2) : [];
+          const kwRecentSpend = kwRecentDates.length > 0 ? aggregateZeptoRows(currByKw[keyword].filter(r => kwRecentDates.includes(r['Date']))).spend : 0;
         const prevKwAgg = prevByKw[keyword] ? aggregateZeptoRows(prevByKw[keyword]) : null;
         return {
           keyword,
           currentSpend: kwAgg?.spend ?? 0,
+            recentSpend: kwRecentSpend,
           currentRoas: kwAgg?.roas ?? null,
           prevSpend: prevKwAgg?.spend ?? null,
           prevRoas: prevKwAgg?.roas ?? null,
