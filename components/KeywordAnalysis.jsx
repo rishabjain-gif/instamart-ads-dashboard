@@ -164,6 +164,11 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                     const campSpend = kwRows.reduce((s, r) => s + (r.spend || 0), 0);
                     const campPrevSpend = kwRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
                     const campSpendChange = avgSpendChange(campSpend, campPrevSpend, currDays, prevDays);
+          const campCurrGMV = kwRows.reduce((s, r) => s + (r.roas || 0) * (r.spend || 0), 0);
+          const campPrevGMV = kwRows.reduce((s, r) => s + (r.prevRoas || 0) * (r.prevSpend || 0), 0);
+          const campCurrRoas = campSpend > 0 ? campCurrGMV / campSpend : null;
+          const campPrevRoasVal = campPrevSpend > 0 ? campPrevGMV / campPrevSpend : null;
+          const campRoasChange = campCurrRoas && campPrevRoasVal ? ((campCurrRoas - campPrevRoasVal) / Math.abs(campPrevRoasVal)) * 100 : null;
                     const campKey = cat + '|||' + campaign;
                     const isCampExp = expandedCamps[campKey] !== false;
                     const campInsight = data.insights ? data.insights.find(i => i.category === cat && i.campaign === campaign) : null;
@@ -188,7 +193,10 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                             ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campSpendChange > 0 ? 'text-green-700' : 'text-red-700')}>{campSpendChange > 0 ? '▲' : '▼'} {Math.abs(campSpendChange).toFixed(1)}%</td>
                             : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
                           }
-                          <td colSpan={5} className="px-3 py-2 text-center text-gray-400 text-xs italic">{kwRows.length} keyword{kwRows.length !== 1 ? 's' : ''}</td>
+                          <td className="px-3 py-2 text-center text-gray-500 text-xs">{campPrevRoasVal ? campPrevRoasVal.toFixed(2) + 'x' : '—'}</td>
+                <td className="px-3 py-2 text-center text-gray-700 text-xs font-semibold">{campCurrRoas ? campCurrRoas.toFixed(2) + 'x' : '—'}</td>
+                {campRoasChange !== null ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campRoasChange > 0 ? 'text-green-700' : 'text-red-700')}>{campRoasChange > 0 ? '▲' : '▼'} {Math.abs(campRoasChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>}
+                <td colSpan={2} className="px-3 py-2 text-center text-gray-400 text-xs italic">{kwRows.length} kw</td>
                         </tr>
                         {isCampExp && kwRows.map((row, idx) => {
                           const rowSpendChange = avgSpendChange(row.spend, row.prevSpend, currDays, prevDays);
