@@ -5,12 +5,14 @@ const MonthlyRoas = dynamic(() => import('@/components/MonthlyRoas'), { ssr: fal
 const PeriodComparison = dynamic(() => import('@/components/PeriodComparison'), { ssr: false });
 const KeywordAnalysis = dynamic(() => import('@/components/KeywordAnalysis'), { ssr: false });
 const CampaignInsights = dynamic(() => import('@/components/CampaignInsights'), { ssr: false });
+const Actions = dynamic(() => import('@/components/Actions'), { ssr: false });
 
 const TABS = [
   { id: 'monthly', label: '📅 Monthly ROAS' },
   { id: 'comparison', label: '🔍 Period Comparison' },
   { id: 'keywords', label: '🎯 Keyword Analysis' },
   { id: 'insights', label: '🚨 Campaign Insights' },
+  { id: 'actions', label: '⚡ Action Items' },
 ];
 
 export default function Home() {
@@ -74,6 +76,7 @@ export default function Home() {
         {activeTab === 'comparison' && <PeriodComparison platform={platform} />}
         {activeTab === 'keywords' && <KeywordAnalysis platform={platform} />}
         {activeTab === 'insights' && <CampaignInsights platform={platform} />}
+        {activeTab === 'actions' && <Actions platform={platform} />}
       </div>
     </div>
   );
