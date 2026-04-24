@@ -6,7 +6,6 @@ export const revalidate = 300;
 const _cache = {};
 function getCached(k) { const e = _cache[k]; return (e && Date.now()-e.ts < 300000) ? e.data : null; }
 function setCached(k, d) { _cache[k] = { data: d, ts: Date.now() }; }
-function clearCached(k) { delete _cache[k]; }
 
 function daysInMonth(year, month) { return new Date(year, month, 0).getDate(); }
 function daysElapsed(year, month) {
@@ -21,16 +20,10 @@ async function fetchSheet(url) {
   return parseCSV(await resp.text());
 }
 
-export async function GET(request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const bust = searchParams.get('bust') === 'true';
-
     const { current, previous } = getZeptoCurrentAndPreviousMonths();
     const cacheKey = 'z_' + current.key + '_' + (previous ? previous.key : 'none');
-
-    if (bust) clearCached(cacheKey);
-
     const cached = getCached(cacheKey);
     if (cached) return Response.json(cached);
 
@@ -55,7 +48,7 @@ export async function GET(request) {
       for (const row of rows) {
         const adType = (row['Ad type'] || 'Unknown').trim();
         const brand = normalizeBrand(row['BrandName']);
-        const cat = (row['Cat'] || row['Category'] || 'Unknown').trim();
+        const cat = (row['Cat'] || row['Category'] || '').trim() || 'Uncategorised';
         const key = adType + '|||' + brand + '|||' + cat;
         if (!groups[key]) groups[key] = { adType, brand, category: cat, rows: [], byKeyword: {} };
         const kw = (row['KeywordName'] || '').trim() || '(no keyword)';
@@ -70,6 +63,12 @@ export async function GET(request) {
     const prevGroups = groupRows(prevRows);
     const allKeys = new Set([...Object.keys(currGroups), ...Object.keys(prevGroups)]);
 
+    // --- Data health ---
+    const allDates = [...new Set(currentRows.map(r => r['Date']).filter(Boolean))].sort();
+    const dataUpTo = allDates.length > 0 ? allDates[allDates.length - 1] : null;
+    const missingCategoryCount = currentRows.filter(r => !(r['Cat'] || r['Category'] || '').trim()).length;
+    const missingKeywordCount = currentRows.filter(r => !(r['KeywordName'] || '').trim()).length;
+
     const results = [];
     for (const key of allKeys) {
       const [adType, brand, category] = key.split('|||');
@@ -78,19 +77,17 @@ export async function GET(request) {
       const currAvg = curr ? curr.spend / currDays : null;
       const prevAvg = prev ? prev.spend / prevDays : null;
 
+      // Build keyword list merging current + previous month data
       const currByKw = currGroups[key]?.byKeyword || {};
       const prevByKw = prevGroups[key]?.byKeyword || {};
       const allKwNames = new Set([...Object.keys(currByKw), ...Object.keys(prevByKw)]);
 
       const keywords = Array.from(allKwNames).map(keyword => {
         const kwAgg = currByKw[keyword] ? aggregateZeptoRows(currByKw[keyword]) : null;
-          const kwRecentDates = currByKw[keyword] ? [...new Set(currByKw[keyword].map(r => r['Date']).filter(Boolean))].sort().slice(-2) : [];
-          const kwRecentSpend = kwRecentDates.length > 0 ? aggregateZeptoRows(currByKw[keyword].filter(r => kwRecentDates.includes(r['Date']))).spend : 0;
         const prevKwAgg = prevByKw[keyword] ? aggregateZeptoRows(prevByKw[keyword]) : null;
         return {
           keyword,
           currentSpend: kwAgg?.spend ?? 0,
-            recentSpend: kwRecentSpend,
           currentRoas: kwAgg?.roas ?? null,
           prevSpend: prevKwAgg?.spend ?? null,
           prevRoas: prevKwAgg?.roas ?? null,
@@ -98,7 +95,9 @@ export async function GET(request) {
       }).sort((a, b) => b.currentSpend - a.currentSpend);
 
       results.push({
-        adType, brand, category,
+        adType,
+        brand,
+        category,
         currentSpend: curr?.spend ?? 0,
         prevSpend: prev?.spend ?? null,
         avgDailySpendChange: currAvg !== null && prevAvg ? calcPctChange(currAvg, prevAvg) : null,
@@ -118,6 +117,7 @@ export async function GET(request) {
       const bk = r.adType + '|||' + r.brand;
       brandSpend[bk] = (brandSpend[bk] || 0) + r.currentSpend;
     }
+
     results.sort((a, b) => {
       const ad = (adTypeSpend[b.adType] || 0) - (adTypeSpend[a.adType] || 0);
       if (ad !== 0) return ad;
@@ -133,9 +133,12 @@ export async function GET(request) {
       previousLabel: previous?.label ?? null,
       currDays,
       prevDays,
-      fetchedAt: new Date().toISOString(),
+      dataUpTo,
+      missingCategoryCount,
+      missingKeywordCount,
       data: results
     };
+
     setCached(cacheKey, result);
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
