@@ -31,6 +31,16 @@ function avgSpendChange(spend, prevSpend, currDays, prevDays) {
   return ((curr - prev) / prev) * 100;
 }
 
+function formatDataDate(dateStr) {
+  if (!dateStr) return null;
+  // Instamart: DD-MM-YYYY, Zepto: DD/MM/YYYY
+  const parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [day, month, year] = parts;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(day)} ${months[parseInt(month)-1]} ${year}`;
+}
+
 export default function KeywordAnalysis({ platform = 'instamart' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -91,35 +101,65 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
   }
   const categories = Object.keys(byCategory);
 
+  // Data quality flags
+  const hasMissingCat = data.missingCategoryCount > 0;
+  const hasMissingKw = data.missingKeywordCount > 0;
+  const hasDataIssues = hasMissingCat || hasMissingKw;
+
   return (
     <div>
+      {/* Data up to + quality notice */}
+      <div className="mb-3 flex items-start gap-3 flex-wrap">
+        {data.dataUpTo && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 font-medium">
+            <span>📅</span>
+            <span>Data up to <span className="font-bold">{formatDataDate(data.dataUpTo)}</span></span>
+          </div>
+        )}
+        {hasDataIssues && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+            <span>⚠️</span>
+            <span>
+              {hasMissingCat && <span><strong>{data.missingCategoryCount}</strong> keyword rows have no category — shown as <em>Uncategorised</em> below</span>}
+              {hasMissingCat && hasMissingKw && <span className="mx-1.5 text-amber-400">·</span>}
+              {hasMissingKw && <span><strong>{data.missingKeywordCount}</strong> rows missing keyword name — included in campaign totals only</span>}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="mb-4 flex items-center gap-4 flex-wrap">
         {hasPrev && (
           <div className="text-sm text-gray-500">
-            Comparing <span className="font-semibold text-gray-700">{data.prevMonthLabel}</span>{prevDays ? ` (${prevDays} days)` : ''}
-            {' '}vs{' '}
+            Comparing <span className="font-semibold text-gray-700">{data.prevMonthLabel}</span>{prevDays ? ` (${prevDays} days)` : ''}{' '}vs{' '}
             <span className="font-semibold text-gray-700">{data.monthLabel} MTD</span>{currDays ? ` (${currDays} days elapsed)` : ''}
           </div>
         )}
         <div>
           <label className="text-sm text-gray-600 mr-2 font-medium">Month:</label>
-          <select className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+          <select
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
             value={selectedMonth}
-            onChange={e => { setSelectedMonth(e.target.value); loadData(e.target.value); }}>
+            onChange={e => { setSelectedMonth(e.target.value); loadData(e.target.value); }}
+          >
             {(data.availableMonths || []).map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
           </select>
         </div>
         <div>
-          <input type="text" placeholder="Search keyword / campaign…"
+          <input
+            type="text"
+            placeholder="Search keyword / campaign…"
             className="text-sm border border-gray-300 rounded px-3 py-1 w-64 bg-white"
-            value={search} onChange={e => setSearch(e.target.value)} />
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
         <div className="text-xs text-gray-400 ml-auto">Keyword Based Ads only • Click to expand/collapse</div>
       </div>
 
-      <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="sticky top-0 z-10">
+          <thead>
             <tr className="bg-gray-800 text-white">
               <th className="px-4 py-3 text-left font-semibold w-72">Category / Campaign / Keyword</th>
               <th className="px-3 py-3 text-right font-semibold">Prev Month Spend</th>
@@ -147,7 +187,8 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                 <Fragment key={cat}>
                   <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => toggleCat(cat)}>
                     <td className="px-4 py-2.5 font-semibold text-gray-800">
-                      <span className="text-gray-400 text-xs mr-2">{isCatExp ? '▼' : '▶'}</span>{cat}
+                      <span className="text-gray-400 text-xs mr-2">{isCatExp ? '▼' : '▶'}</span>
+                      {cat === 'Uncategorised' ? <span className="text-amber-600">{cat}</span> : cat}
                     </td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-500">{catPrevSpend > 0 ? fmtSpend(catPrevSpend) : '—'}</td>
                     <td className="px-3 py-2.5 text-right text-gray-400 text-xs">{catPrevSpend > 0 && prevDays ? fmtSpend(catPrevSpend / prevDays) : '—'}</td>
@@ -159,19 +200,22 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                     }
                     <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{campNames.length} campaign{campNames.length !== 1 ? 's' : ''}</td>
                   </tr>
+
                   {isCatExp && campNames.map(campaign => {
                     const kwRows = campaigns[campaign];
                     const campSpend = kwRows.reduce((s, r) => s + (r.spend || 0), 0);
                     const campPrevSpend = kwRows.reduce((s, r) => s + (r.prevSpend || 0), 0);
                     const campSpendChange = avgSpendChange(campSpend, campPrevSpend, currDays, prevDays);
-          const campCurrGMV = kwRows.reduce((s, r) => s + (r.roas || 0) * (r.spend || 0), 0);
-          const campPrevGMV = kwRows.reduce((s, r) => s + (r.prevRoas || 0) * (r.prevSpend || 0), 0);
-          const campCurrRoas = campSpend > 0 ? campCurrGMV / campSpend : null;
-          const campPrevRoasVal = campPrevSpend > 0 ? campPrevGMV / campPrevSpend : null;
-          const campRoasChange = campCurrRoas && campPrevRoasVal ? ((campCurrRoas - campPrevRoasVal) / Math.abs(campPrevRoasVal)) * 100 : null;
                     const campKey = cat + '|||' + campaign;
                     const isCampExp = expandedCamps[campKey] !== false;
                     const campInsight = data.insights ? data.insights.find(i => i.category === cat && i.campaign === campaign) : null;
+
+                    // Campaign-level ROAS
+                    const campCurrGMV = kwRows.reduce((s, r) => s + (r.roas || 0) * (r.spend || 0), 0);
+                    const campPrevGMV = kwRows.reduce((s, r) => s + (r.prevRoas || 0) * (r.prevSpend || 0), 0);
+                    const campCurrRoas = campSpend > 0 ? campCurrGMV / campSpend : null;
+                    const campPrevRoasVal = campPrevSpend > 0 ? campPrevGMV / campPrevSpend : null;
+                    const campRoasChange = campCurrRoas && campPrevRoasVal ? ((campCurrRoas - campPrevRoasVal) / Math.abs(campPrevRoasVal)) * 100 : null;
 
                     return (
                       <Fragment key={campKey}>
@@ -193,16 +237,27 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
                             ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campSpendChange > 0 ? 'text-green-700' : 'text-red-700')}>{campSpendChange > 0 ? '▲' : '▼'} {Math.abs(campSpendChange).toFixed(1)}%</td>
                             : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
                           }
-                          <td className="px-3 py-2 text-center text-gray-500 text-xs">{campPrevRoasVal ? campPrevRoasVal.toFixed(2) + 'x' : '—'}</td>
-                <td className="px-3 py-2 text-center text-gray-700 text-xs font-semibold">{campCurrRoas ? campCurrRoas.toFixed(2) + 'x' : '—'}</td>
-                {campRoasChange !== null ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campRoasChange > 0 ? 'text-green-700' : 'text-red-700')}>{campRoasChange > 0 ? '▲' : '▼'} {Math.abs(campRoasChange).toFixed(1)}%</td> : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>}
-                <td colSpan={2} className="px-3 py-2 text-center text-gray-400 text-xs italic">{kwRows.length} kw</td>
+                          {/* Campaign-level ROAS cells */}
+                          <td className="px-3 py-2 text-center text-xs text-gray-600">{campPrevRoasVal ? campPrevRoasVal.toFixed(2) + 'x' : '—'}</td>
+                          <td className="px-3 py-2 text-center text-xs text-gray-700 font-medium">{campCurrRoas ? campCurrRoas.toFixed(2) + 'x' : '—'}</td>
+                          {campRoasChange !== null
+                            ? <td className={'px-3 py-2 text-center text-xs font-semibold ' + (campRoasChange > 0 ? 'text-green-700' : 'text-red-700')}>{campRoasChange > 0 ? '▲' : '▼'} {Math.abs(campRoasChange).toFixed(1)}%</td>
+                            : <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
+                          }
+                          <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
+                          <td className="px-3 py-2 text-center text-gray-400 text-xs">—</td>
                         </tr>
+
                         {isCampExp && kwRows.map((row, idx) => {
                           const rowSpendChange = avgSpendChange(row.spend, row.prevSpend, currDays, prevDays);
                           return (
                             <tr key={campKey + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2 pl-14 text-gray-600 text-xs"><span className="text-gray-300 mr-2">└</span>{row.keyword}{((row.spend === 0 && row.prevSpend > 0) || (row.recentSpend === 0 && row.spend > 0)) && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full font-medium">⏸ Paused</span>}</td>
+                              <td className="px-4 py-2 pl-14 text-gray-600 text-xs">
+                                <span className="text-gray-300 mr-2">└</span>
+                                {row.keyword}
+                                {((row.spend === 0 && row.prevSpend > 0) || (row.recentSpend === 0 && row.spend > 0)) &&
+                                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full font-medium">⏸ Paused</span>}
+                              </td>
                               <td className="px-3 py-2 text-right text-gray-500 text-xs">{row.prevSpend ? fmtSpend(row.prevSpend) : '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-400 text-xs">{row.prevSpend && prevDays ? fmtSpend(row.prevSpend / prevDays) : '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-700 text-xs">{fmtSpend(row.spend)}</td>
@@ -225,6 +280,7 @@ export default function KeywordAnalysis({ platform = 'instamart' }) {
           </tbody>
         </table>
       </div>
+
       <p className="mt-3 text-xs text-gray-400">
         Avg Daily = Total Spend / Days available • Avg Daily Spend Δ% = (MTD daily avg − Prev month daily avg) / Prev month daily avg • ROAS = 7-day GMV / Spend • CPC Δ% red = cost up (bad) • CVR Δ% red = conversions dropped (bad)
         {hasPrev && (' • Δ% vs ' + data.prevMonthLabel)}
