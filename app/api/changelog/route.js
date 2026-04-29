@@ -16,6 +16,18 @@ async function fetchSheet(url) {
   return parseCSV(await resp.text());
 }
 
+// Changelog sheet has a blank row 1 - strip rows that are only commas/whitespace
+// so parseCSV picks up the real header row correctly
+async function fetchChangelogSheet(url) {
+  const resp = await fetch(url, { cache: 'no-store' });
+  if (!resp.ok) throw new Error('Changelog fetch failed: ' + resp.status);
+  const text = await resp.text();
+  const cleaned = text.split('\n')
+    .filter(l => l.replace(/,/g, '').trim().length > 0)
+    .join('\n');
+  return parseCSV(cleaned);
+}
+
 function addDays(date, n) {
   const d = new Date(date);
   d.setDate(d.getDate() + n);
@@ -42,7 +54,7 @@ export async function GET() {
     const zpKeys = Object.keys(ZEPTO_SHEETS).sort().slice(-2);
 
     const fetches = [
-      fetchSheet(CHANGELOG_URL),
+      fetchChangelogSheet(CHANGELOG_URL),
       ...imKeys.map(k => fetchSheet(SHEETS[k].url)),
       ...zpKeys.map(k => fetchSheet(ZEPTO_SHEETS[k].url)),
     ];
