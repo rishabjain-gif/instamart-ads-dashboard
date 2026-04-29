@@ -47,7 +47,7 @@ function MetricsTable({ before, after, daysAfter, complete }) {
     { label: 'Clicks', key: 'clicks', fmt: fmtNum,   higherIsBetter: true  },
   ];
 
-  const afterLabel = complete ? 'After (7d)' : `After (${daysAfter}d so far)`;
+  const afterLabel = complete ? 'After (7d)' : `After (${daysAfter}d)`;
 
   return (
     <div className="mt-3">
@@ -65,31 +65,41 @@ function MetricsTable({ before, after, daysAfter, complete }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Metric</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Before (7d)</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{afterLabel}</th>
-              <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Change</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Period</th>
+              {metrics.map(m => (
+                <th key={m.key} className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{m.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {metrics.map(m => {
-              const bVal = before ? before[m.key] : null;
-              const aVal = after ? after[m.key] : null;
-              return (
-                <tr key={m.key} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-2.5 font-medium text-gray-700">{m.label}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-600 tabular-nums">
-                    {before ? m.fmt(bVal) : <span className="text-gray-300">No data</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-gray-600 tabular-nums">
-                    {after ? m.fmt(aVal) : <span className="text-gray-300">{daysAfter === 0 ? 'Pending' : 'No data'}</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <Delta before={bVal} after={aVal} higherIsBetter={m.higherIsBetter} />
-                  </td>
-                </tr>
-              );
-            })}
+            <tr className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">Before (7d)</td>
+              {metrics.map(m => (
+                <td key={m.key} className="px-4 py-2.5 text-right text-gray-600 tabular-nums">
+                  {before ? m.fmt(before[m.key]) : <span className="text-gray-300">—</span>}
+                </td>
+              ))}
+            </tr>
+            <tr className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">{afterLabel}</td>
+              {metrics.map(m => (
+                <td key={m.key} className="px-4 py-2.5 text-right text-gray-600 tabular-nums">
+                  {after ? m.fmt(after[m.key]) : <span className="text-gray-300">{daysAfter === 0 ? 'Pending' : '—'}</span>}
+                </td>
+              ))}
+            </tr>
+            <tr className="bg-gray-50/60 font-medium">
+              <td className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Change</td>
+              {metrics.map(m => (
+                <td key={m.key} className="px-4 py-2.5 text-right">
+                  <Delta
+                    before={before ? before[m.key] : null}
+                    after={after ? after[m.key] : null}
+                    higherIsBetter={m.higherIsBetter}
+                  />
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>
