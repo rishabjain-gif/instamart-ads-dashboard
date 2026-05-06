@@ -7,25 +7,36 @@ function getCached(k) { const e = _cache[k]; return (e && Date.now()-e.ts < 3000
 function setCached(k, d) { _cache[k] = { data: d, ts: Date.now() }; }
 
 function parseInputDate(str) { const [y,m,d] = str.split('-').map(Number); return new Date(y,m-1,d); }
-async function fetchAndFilter(url, start, end) {
+
+async function fetchSheet(url) {
   const resp = await fetch(url, { next: { revalidate: 300 } });
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
-  const rows = parseCSV(await resp.text());
-  return rows.filter(row => { const d = parseDate(row['METRICS_DATE']); return d && d >= start && d <= end; });
+  return parseCSV(await resp.text());
 }
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const monthKey = searchParams.get('month'), startA = searchParams.get('startA'), endA = searchParams.get('endA'), startB = searchParams.get('startB'), endB = searchParams.get('endB');
     if (!monthKey||!startA||!endA||!startB||!endB) return Response.json({ error: 'Missing parameters' }, { status: 400 });
-    const sheet = SHEETS[monthKey];
-    if (!sheet) return Response.json({ error: 'Invalid month' }, { status: 400 });
+    if (!SHEETS[monthKey]) return Response.json({ error: 'Invalid month' }, { status: 400 });
 
     const cacheKey = monthKey + '_' + startA + '_' + endA + '_' + startB + '_' + endB;
     const cached = getCached(cacheKey);
     if (cached) return Response.json(cached);
 
-    const [rowsA, rowsB] = await Promise.all([fetchAndFilter(sheet.url,parseInputDate(startA),parseInputDate(endA)), fetchAndFilter(sheet.url,parseInputDate(startB),parseInputDate(endB))]);
+    // Fetch current month + previous month to support cross-month date ranges
+    const keys = Object.keys(SHEETS).sort();
+    const monthIdx = keys.indexOf(monthKey);
+    const relevantKeys = monthIdx > 0 ? [keys[monthIdx - 1], keys[monthIdx]] : [keys[monthIdx]];
+    const allRowsFetched = await Promise.all(relevantKeys.map(k => fetchSheet(SHEETS[k].url)));
+    const allRows = allRowsFetched.flat();
+
+    const startADate = parseInputDate(startA), endADate = parseInputDate(endA);
+    const startBDate = parseInputDate(startB), endBDate = parseInputDate(endB);
+    const rowsA = allRows.filter(row => { const d = parseDate(row['METRICS_DATE']); return d && d >= startADate && d <= endADate; });
+    const rowsB = allRows.filter(row => { const d = parseDate(row['METRICS_DATE']); return d && d >= startBDate && d <= endBDate; });
+
     function groupAdProp(rows) {
       const g = {};
       for (const row of rows) { const cat=row['Category']||row['L1_CATEGORY']||'Unknown'; const adProp=row['AD_PROPERTY']||'Unknown'; const key=cat+'|||'+adProp;
