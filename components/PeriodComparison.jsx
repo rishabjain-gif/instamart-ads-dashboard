@@ -4,21 +4,21 @@ import { SHEETS } from '@/lib/config';
 import { ZEPTO_SHEETS } from '@/lib/zeptoConfig';
 
 function fmtSpend(n) {
-  if (!n) return 'â¹0';
-  if (n >= 10000000) return 'â¹' + (n/10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return 'â¹' + (n/100000).toFixed(1) + 'L';
-  if (n >= 1000) return 'â¹' + (n/1000).toFixed(1) + 'K';
-  return 'â¹' + n.toFixed(0);
+  if (!n) return '₹0';
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(1) + 'Cr';
+  if (n >= 100000) return '₹' + (n/100000).toFixed(1) + 'L';
+  if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + n.toFixed(0);
 }
 function RoasCell({ value }) {
-  if (!value) return <td className="px-3 py-2 text-center text-gray-400 text-sm">â</td>;
+  if (!value) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
   return <td className="px-3 py-2 text-center text-sm text-gray-800">{value.toFixed(2)}x</td>;
 }
 function ChangeCell({ value, invert = false }) {
-  if (value === null || value === undefined) return <td className="px-3 py-2 text-center text-gray-400 text-sm">â</td>;
+  if (value === null || value === undefined) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
   const isGood = invert ? value < 0 : value > 0;
   const color = isGood ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
-  const arrow = value > 0 ? 'â²' : 'â¼';
+  const arrow = value > 0 ? '▲' : '▼';
   return <td className={'px-3 py-2 text-center text-sm font-medium ' + color}>{arrow} {Math.abs(value).toFixed(1)}%</td>;
 }
 
@@ -115,7 +115,7 @@ export default function PeriodComparison({ platform = 'instamart' }) {
             </select>
           </div>
           <div className="border border-blue-100 rounded-lg p-3 bg-blue-50">
-            <div className="text-xs font-semibold text-blue-700 mb-2">Period A â Base (older)</div>
+            <div className="text-xs font-semibold text-blue-700 mb-2">Period A — Base (older)</div>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block text-xs text-gray-500 mb-1">From</label>
@@ -130,7 +130,7 @@ export default function PeriodComparison({ platform = 'instamart' }) {
             </div>
           </div>
           <div className="border border-orange-100 rounded-lg p-3 bg-orange-50">
-            <div className="text-xs font-semibold text-orange-700 mb-2">Period B â Compare (recent)</div>
+            <div className="text-xs font-semibold text-orange-700 mb-2">Period B — Compare (recent)</div>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block text-xs text-gray-500 mb-1">From</label>
@@ -148,9 +148,9 @@ export default function PeriodComparison({ platform = 'instamart' }) {
         <div className="mt-4 flex items-center gap-3">
           <button onClick={handleCompare} disabled={loading}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {loading ? 'Loadingâ¦' : 'Compare Periods'}
+            {loading ? 'Loading…' : 'Compare Periods'}
           </button>
-          {loading && <p className="text-sm text-gray-500">Fetching dataâ¦ may take 15â20 seconds</p>}
+          {loading && <p className="text-sm text-gray-500">Fetching data… may take 15–20 seconds</p>}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
       </div>
@@ -158,8 +158,8 @@ export default function PeriodComparison({ platform = 'instamart' }) {
       {data && (
         <>
           <div>
-            <h3 className="font-semibold text-gray-800 mb-3">Category â Ad Property Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">ROAS Î% = change from Period A to Period B. Red = deterioration.</p>
+            <h3 className="font-semibold text-gray-800 mb-3">Category → Ad Property Breakdown</h3>
+            <p className="text-xs text-gray-500 mb-3">ROAS Δ% = change from Period A to Period B. Red = deterioration.</p>
             <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10">
@@ -168,9 +168,9 @@ export default function PeriodComparison({ platform = 'instamart' }) {
                     <th className="px-3 py-3 text-right font-semibold">Spend A</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS A</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS B</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS Î%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CPC Î%<br/><span className="font-normal text-gray-400 text-xs">(â bad)</span></th>
-                    <th className="px-3 py-3 text-center font-semibold">CVR Î%<br/><span className="font-normal text-gray-400 text-xs">(â bad)</span></th>
+                    <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
+                    <th className="px-3 py-3 text-center font-semibold">CPC Δ%<br/><span className="font-normal text-gray-400 text-xs">(↑ bad)</span></th>
+                    <th className="px-3 py-3 text-center font-semibold">CVR Δ%<br/><span className="font-normal text-gray-400 text-xs">(↓ bad)</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -182,7 +182,7 @@ export default function PeriodComparison({ platform = 'instamart' }) {
                       <Fragment key={cat}>
                         <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle1(cat)}>
                           <td className="px-4 py-2.5 font-semibold text-gray-800">
-                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? 'â¼' : 'â¶'}</span>{cat}
+                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : 'â¶'}</span>{cat}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
                           <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{rows.length} ad type{rows.length !== 1 ? 's' : ''}</td>
@@ -207,8 +207,8 @@ export default function PeriodComparison({ platform = 'instamart' }) {
           </div>
 
           <div>
-            <h3 className="font-semibold text-gray-800 mb-1">Category â Campaign â Keyword Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">Keyword Based Ads only â¢ % of Category Spend based on Period A â¢ Sorted by spend</p>
+            <h3 className="font-semibold text-gray-800 mb-1">Category → Campaign → Keyword Breakdown</h3>
+            <p className="text-xs text-gray-500 mb-3">Keyword Based Ads only • % of Category Spend based on Period A • Sorted by spend</p>
             <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10">
@@ -218,9 +218,9 @@ export default function PeriodComparison({ platform = 'instamart' }) {
                     <th className="px-3 py-3 text-center font-semibold">% of Cat</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS A</th>
                     <th className="px-3 py-3 text-center font-semibold">ROAS B</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS Î%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CPC Î%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CVR Î%</th>
+                    <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
+                    <th className="px-3 py-3 text-center font-semibold">CPC Δ%</th>
+                    <th className="px-3 py-3 text-center font-semibold">CVR Δ%</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -232,7 +232,7 @@ export default function PeriodComparison({ platform = 'instamart' }) {
                       <Fragment key={cat}>
                         <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle2(cat)}>
                           <td className="px-4 py-2.5 font-semibold text-gray-800">
-                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? 'â¼' : 'â¶'}</span>{cat}
+                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : 'â¶'}</span>{cat}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
                           <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{Object.keys(campaigns).length} campaign{Object.keys(campaigns).length !== 1 ? 's' : ''}</td>
@@ -251,7 +251,7 @@ export default function PeriodComparison({ platform = 'instamart' }) {
                                 <tr key={cat + '-' + campaign + '-' + kwIdx} className={kwIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                   <td className="px-4 py-2 pl-14 text-gray-600"><span className="text-gray-300 mr-2">â</span>{row.keyword}</td>
                                   <td className="px-3 py-2 text-right text-gray-700">{fmtSpend(row.spendA)}</td>
-                                  <td className="px-3 py-2 text-center text-gray-600">{row.pctOfCatSpend > 0 ? row.pctOfCatSpend.toFixed(1) + '%' : 'â'}</td>
+                                  <td className="px-3 py-2 text-center text-gray-600">{row.pctOfCatSpend > 0 ? row.pctOfCatSpend.toFixed(1) + '%' : '—'}</td>
                                   <RoasCell value={row.roasA} />
                                   <RoasCell value={row.roasB} />
                                   <ChangeCell value={row.roasChange} />
