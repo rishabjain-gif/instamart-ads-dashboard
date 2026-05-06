@@ -96,11 +96,11 @@ export async function GET() {
       if (platform.toLowerCase() === 'zepto') {
         const campRows = zpRows.filter(r => (r['Campaign_id'] || '').trim() === campaignId);
         const beforeRows = campRows.filter(r => {
-          const d = parseZeptoDate(r['Date']);
+          const d = parseDate(r['Date']);
           return d && inWindow(d, beforeStart, beforeEnd);
         });
         const afterRows = campRows.filter(r => {
-          const d = parseZeptoDate(r['Date']);
+          const d = parseDate(r['Date']);
           return d && inWindow(d, afterStart, effectiveAfterEnd);
         });
         if (beforeRows.length) beforeAgg = aggregateZeptoRows(beforeRows);
