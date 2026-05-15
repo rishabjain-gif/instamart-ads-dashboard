@@ -80,10 +80,10 @@ export async function GET() {
       const changeDate = parseZeptoDate(dateStr);
       if (!changeDate) continue;
 
-      const beforeStart = startOfDay(addDays(changeDate, -7));
+      const beforeStart = startOfDay(addDays(changeDate, -14));
       const beforeEnd = startOfDay(addDays(changeDate, -1));
       const afterStart = startOfDay(changeDate);
-      const afterEnd = startOfDay(addDays(changeDate, 6));
+      const afterEnd = startOfDay(addDays(changeDate, 13));
       const effectiveAfterEnd = afterEnd <= today ? afterEnd : today;
 
       const daysAfter = effectiveAfterEnd >= afterStart
@@ -123,7 +123,7 @@ export async function GET() {
         campaignId, campaignName, platform, date: dateStr,
         changeDone, current, whatChange,
         before: beforeAgg, after: afterAgg,
-        daysAfter, complete: daysAfter >= 7,
+        daysAfter, complete: daysAfter >= 14,
       });
     }
 
