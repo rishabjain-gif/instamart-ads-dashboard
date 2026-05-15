@@ -38,7 +38,7 @@ function Delta({ before, after, higherIsBetter = true }) {
   );
 }
 
-function MetricsTable({ before, after, daysAfter, complete }) {
+function MetricsTable({ before, after, daysAfter, complete, isZepto = false }) {
   const metrics = [
     { label: 'Spend',  key: 'spend',  fmt: fmtSpend, higherIsBetter: false },
     { label: 'ROAS',   key: 'roas',   fmt: fmtRoas,  higherIsBetter: true  },
@@ -47,13 +47,20 @@ function MetricsTable({ before, after, daysAfter, complete }) {
     { label: 'Clicks', key: 'clicks', fmt: fmtNum,   higherIsBetter: true  },
   ];
 
-  const afterLabel = complete ? 'After (7d)' : `After (${daysAfter}d)`;
+  if (isZepto) {
+    metrics.push(
+      { label: 'Units',      key: 'units',        fmt: fmtNum,   higherIsBetter: true  },
+      { label: 'Spend/Unit', key: 'spendPerUnit', fmt: fmtSpend, higherIsBetter: false },
+    );
+  }
+
+  const afterLabel = complete ? 'After (14d)' : `After (${daysAfter}d)`;
 
   return (
     <div className="mt-3">
       {!complete && daysAfter > 0 && (
         <div className="mb-2 inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1">
-          ⏳ Only {daysAfter} day{daysAfter !== 1 ? 's' : ''} of after-data so far — check back once 7 days have passed for a full comparison
+          ⏳ Only {daysAfter} day{daysAfter !== 1 ? 's' : ''} of after-data so far — check back once 14 days have passed for a full comparison
         </div>
       )}
       {daysAfter === 0 && (
@@ -73,7 +80,7 @@ function MetricsTable({ before, after, daysAfter, complete }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             <tr className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">Before (7d)</td>
+              <td className="px-4 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">Before (14d)</td>
               {metrics.map(m => (
                 <td key={m.key} className="px-4 py-2.5 text-right text-gray-600 tabular-nums">
                   {before ? m.fmt(before[m.key]) : <span className="text-gray-300">—</span>}
@@ -180,6 +187,7 @@ function ChangeCard({ change }) {
             after={change.after}
             daysAfter={change.daysAfter}
             complete={change.complete}
+            isZepto={isZepto}
           />
         </div>
       )}
