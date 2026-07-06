@@ -7,6 +7,7 @@ const PeriodComparison  = dynamic(() => import('@/components/PeriodComparison'),
 const KeywordAnalysis   = dynamic(() => import('@/components/KeywordAnalysis'),   { ssr: false });
 const CampaignInsights  = dynamic(() => import('@/components/CampaignInsights'),  { ssr: false });
 const Actions           = dynamic(() => import('@/components/Actions'),           { ssr: false });
+const Actionables       = dynamic(() => import('@/components/Actionables'),       { ssr: false });
 const ChangeLog         = dynamic(() => import('@/components/ChangeLog'),         { ssr: false });
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'keywords',   label: '🎯 Keyword Analysis'    },
   { id: 'insights',   label: '🚨 Campaign Insights'   },
   { id: 'actions',    label: '⚡ Action Items'           },
+  { id: 'actionables', label: '✅ Actionables'          },
   { id: 'changelog',  label: '📋 Change Log'          },
 ];
 
@@ -87,6 +89,7 @@ export default function Home() {
         {activeTab === 'keywords'   && <KeywordAnalysis  platform={platform} />}
         {activeTab === 'insights'   && <CampaignInsights platform={platform} />}
         {activeTab === 'actions'    && <Actions          platform={platform} />}
+        {activeTab === 'actionables' && <Actionables      platform={platform} />}
         {activeTab === 'changelog'  && <ChangeLog        platform={platform} />}
       </div>
     </div>
