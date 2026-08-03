@@ -1,12 +1,34 @@
 import { SHEETS } from '@/lib/config';
-import { parseCSV, aggregateRows, calcPctChange, parseDate } from '@/lib/dataUtils';
+import { parseCSV, toNum } from '@/lib/dataUtils';
+
 export const revalidate = 300;
 
 const _cache = {};
 function getCached(k) { const e = _cache[k]; return (e && Date.now()-e.ts < 300000) ? e.data : null; }
 function setCached(k, d) { _cache[k] = { data: d, ts: Date.now() }; }
 
-function parseInputDate(str) { const [y,m,d] = str.split('-').map(Number); return new Date(y,m-1,d); }
+// Parse YYYY-MM-DD input from date picker
+function parseInputDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+// Parse DD/MM/YY or DD/MM/YYYY or DD-MM-YYYY from sheet data
+function parseRowDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const sep = s.includes('/') ? '/' : '-';
+  const parts = s.split(sep).map(Number);
+  if (parts.length !== 3) return null;
+  const [d, m, y] = parts;
+  if (!d || !m || !y) return null;
+  const fullY = y < 100 ? 2000 + y : y;
+  const date = new Date(fullY, m - 1, d);
+  date.setHours(0, 0, 0, 0);
+  return isNaN(date.getTime()) ? null : date;
+}
 
 async function fetchSheet(url) {
   const resp = await fetch(url, { next: { revalidate: 300 } });
@@ -14,61 +36,100 @@ async function fetchSheet(url) {
   return parseCSV(await resp.text());
 }
 
+function agg(rows) {
+  let spend = 0, gmv = 0, clicks = 0, convs = 0;
+  for (const r of rows) {
+    spend += toNum(r['TOTAL_BUDGET_BURNT']);
+    gmv += toNum(r['TOTAL_DIRECT_GMV_7_DAYS']);
+    clicks += toNum(r['TOTAL_CLICKS']);
+    convs += toNum(r['TOTAL_CONVERSIONS']);
+  }
+  return { spend, gmv, clicks, convs, roas: spend > 0 ? gmv / spend : 0 };
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const monthKey = searchParams.get('month'), startA = searchParams.get('startA'), endA = searchParams.get('endA'), startB = searchParams.get('startB'), endB = searchParams.get('endB');
-    if (!monthKey||!startA||!endA||!startB||!endB) return Response.json({ error: 'Missing parameters' }, { status: 400 });
-    if (!SHEETS[monthKey]) return Response.json({ error: 'Invalid month' }, { status: 400 });
+    const startA = searchParams.get('startA'), endA = searchParams.get('endA');
+    const startB = searchParams.get('startB'), endB = searchParams.get('endB');
+    if (!startA || !endA || !startB || !endB) {
+      return Response.json({ error: 'Missing parameters: startA, endA, startB, endB required' }, { status: 400 });
+    }
 
-    const cacheKey = monthKey + '_' + startA + '_' + endA + '_' + startB + '_' + endB;
+    const cacheKey = `cmp_im_${startA}_${endA}_${startB}_${endB}`;
     const cached = getCached(cacheKey);
     if (cached) return Response.json(cached);
 
-    // Fetch current month + previous month to support cross-month date ranges
-    const keys = Object.keys(SHEETS).sort();
-    const monthIdx = keys.indexOf(monthKey);
-    const relevantKeys = monthIdx > 0 ? [keys[monthIdx - 1], keys[monthIdx]] : [keys[monthIdx]];
-    const allRowsFetched = await Promise.all(relevantKeys.map(k => fetchSheet(SHEETS[k].url)));
-    const allRows = allRowsFetched.flat();
+    // Auto-detect which sheets to fetch based on date range
+    const boundaries = [startA, endA, startB, endB].map(parseInputDate);
+    const minDate = new Date(Math.min(...boundaries.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...boundaries.map(d => d.getTime())));
 
-    const startADate = parseInputDate(startA), endADate = parseInputDate(endA);
-    const startBDate = parseInputDate(startB), endBDate = parseInputDate(endB);
-    const rowsA = allRows.filter(row => { const d = parseDate(row['METRICS_DATE']); return d && d >= startADate && d <= endADate; });
-    const rowsB = allRows.filter(row => { const d = parseDate(row['METRICS_DATE']); return d && d >= startBDate && d <= endBDate; });
+    const sheetsToFetch = Object.values(SHEETS).filter(v => {
+      const sheetStart = new Date(v.year, v.month - 1, 1);
+      const sheetEnd = new Date(v.year, v.month, 0); // last day of month
+      return sheetEnd >= minDate && sheetStart <= maxDate;
+    });
 
-    function groupAdProp(rows) {
+    if (sheetsToFetch.length === 0) {
+      return Response.json({ error: 'No data available for the selected date range' }, { status: 400 });
+    }
+
+    const fetched = await Promise.all(sheetsToFetch.map(v => fetchSheet(v.url)));
+    const allRows = fetched.flat();
+
+    const sA = parseInputDate(startA), eA = parseInputDate(endA);
+    const sB = parseInputDate(startB), eB = parseInputDate(endB);
+    eA.setHours(23, 59, 59, 999);
+    eB.setHours(23, 59, 59, 999);
+
+    const rowsA = allRows.filter(r => { const d = parseRowDate(r['METRICS_DATE']); return d && d >= sA && d <= eA; });
+    const rowsB = allRows.filter(r => { const d = parseRowDate(r['METRICS_DATE']); return d && d >= sB && d <= eB; });
+
+    // Group rows by Brand > Category > Campaign > Keyword
+    function groupRows(rows) {
       const g = {};
-      for (const row of rows) { const cat=row['Category']||row['L1_CATEGORY']||'Unknown'; const adProp=row['AD_PROPERTY']||'Unknown'; const key=cat+'|||'+adProp;
-        if (!g[key]) g[key]={category:cat,adProperty:adProp,rows:[]}; g[key].rows.push(row); } return g; }
-    const apA=groupAdProp(rowsA), apB=groupAdProp(rowsB), apKeys=new Set([...Object.keys(apA),...Object.keys(apB)]);
-    const table1=[];
-    for (const key of apKeys) {
-      const [category,adProperty]=key.split('|||');
-      const a=apA[key]?aggregateRows(apA[key].rows):null, b=apB[key]?aggregateRows(apB[key].rows):null;
-      table1.push({category,adProperty,spendA:a?.spend??0,roasA:a?.roas??null,roasB:b?.roas??null,
-        roasChange:a&&b?calcPctChange(b.roas,a.roas):null,cpcChange:a&&b?calcPctChange(b.cpc,a.cpc):null,cvrChange:a&&b?calcPctChange(b.cvr,a.cvr):null}); }
-    const catSpend1={}; for(const r of table1) catSpend1[r.category]=(catSpend1[r.category]||0)+r.spendA;
-    table1.sort((a,b)=>{ const cd=(catSpend1[b.category]||0)-(catSpend1[a.category]||0); return cd!==0?cd:b.spendA-a.spendA; });
-    const kwA=rowsA.filter(r=>r['AD_PROPERTY']==='Keyword Based Ads'), kwB=rowsB.filter(r=>r['AD_PROPERTY']==='Keyword Based Ads');
-    function groupKeyword(rows) {
-      const g={};
-      for(const row of rows){const cat=row['Category']||row['L1_CATEGORY']||'Unknown',campaign=row['CAMPAIGN_NAME']||'Unknown',keyword=row['KEYWORD']||'Unknown',key=cat+'|||'+campaign+'|||'+keyword;
-        if(!g[key])g[key]={category:cat,campaign,keyword,rows:[]}; g[key].rows.push(row);} return g;}
-    const kwGA=groupKeyword(kwA),kwGB=groupKeyword(kwB),kwKeys=new Set([...Object.keys(kwGA),...Object.keys(kwGB)]);
-    const catTotalA={};
-    for(const key of kwKeys){const[cat]=key.split('|||');const a=kwGA[key]?aggregateRows(kwGA[key].rows):null;catTotalA[cat]=(catTotalA[cat]||0)+(a?.spend??0);}
-    const table2=[];
-    for(const key of kwKeys){
-      const[category,campaign,keyword]=key.split('|||');
-      const a=kwGA[key]?aggregateRows(kwGA[key].rows):null,b=kwGB[key]?aggregateRows(kwGB[key].rows):null,spendA=a?.spend??0;
-      table2.push({category,campaign,keyword,spendA,pctOfCatSpend:catTotalA[category]>0?(spendA/catTotalA[category])*100:0,
-        roasA:a?.roas??null,roasB:b?.roas??null,roasChange:a&&b?calcPctChange(b.roas,a.roas):null,cpcChange:a&&b?calcPctChange(b.cpc,a.cpc):null,cvrChange:a&&b?calcPctChange(b.cvr,a.cvr):null});}
-    const catSpend2={},campSpend2={};
-    for(const r of table2){catSpend2[r.category]=(catSpend2[r.category]||0)+r.spendA;const ck=r.category+'|||'+r.campaign;campSpend2[ck]=(campSpend2[ck]||0)+r.spendA;}
-    table2.sort((a,b)=>{const cd=(catSpend2[b.category]||0)-(catSpend2[a.category]||0);if(cd!==0)return cd;const ckA=a.category+'|||'+a.campaign,ckB=b.category+'|||'+b.campaign;const campD=(campSpend2[ckB]||0)-(campSpend2[ckA]||0);return campD!==0?campD:b.spendA-a.spendA;});
-    const result = {table1,table2};
+      for (const r of rows) {
+        const brand = ((r['Brand'] || '').trim().replace(/^#N\/A$/, '')) || 'Unbranded';
+        const cat = (r['L1_CATEGORY'] || r['Category'] || 'Unknown').trim();
+        const camp = (r['CAMPAIGN_NAME'] || 'Unknown').trim();
+        const kw = (r['KEYWORD'] || '').trim();
+        const key = brand + '|||' + cat + '|||' + camp + '|||' + kw;
+        if (!g[key]) g[key] = { brand, cat, camp, kw, rows: [] };
+        g[key].rows.push(r);
+      }
+      return g;
+    }
+
+    const gA = groupRows(rowsA);
+    const gB = groupRows(rowsB);
+    const allKeys = new Set([...Object.keys(gA), ...Object.keys(gB)]);
+
+    const rows = [];
+    for (const key of allKeys) {
+      const [brand, cat, camp, kw] = key.split('|||');
+      const a = gA[key] ? agg(gA[key].rows) : { spend: 0, gmv: 0, roas: 0 };
+      const b = gB[key] ? agg(gB[key].rows) : { spend: 0, gmv: 0, roas: 0 };
+      rows.push({
+        brand, cat, camp, kw,
+        spendA: a.spend, gmvA: a.gmv, roasA: a.roas,
+        spendB: b.spend, gmvB: b.gmv, roasB: b.roas,
+      });
+    }
+
+    const result = {
+      rows,
+      periodA: { start: startA, end: endA },
+      periodB: { start: startB, end: endB },
+      rowCountA: rowsA.length,
+      rowCountB: rowsB.length,
+    };
     setCached(cacheKey, result);
-    return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' } });
-  } catch(err){console.error(err);return Response.json({error:err.message},{status:500});}
+    return new Response(JSON.stringify(result), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=300, stale-while-revalidate=86400' }
+    });
+  } catch (err) {
+    console.error(err);
+    return Response.json({ error: err.message }, { status: 500 });
+  }
 }
