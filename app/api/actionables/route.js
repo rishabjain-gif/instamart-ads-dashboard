@@ -30,8 +30,9 @@ function parseFlexDate(s) {
   if (!s) return null;
   const parts = String(s).trim().split(/[\/\-]/);
   if (parts.length !== 3) return null;
-  const [d, m, y] = parts.map(Number);
-  if (!d || !m || !y) return null;
+  const [d, m, yRaw] = parts.map(Number);
+  if (!d || !m || !yRaw) return null;
+  const y = yRaw < 100 ? 2000 + yRaw : yRaw; // handle DD/MM/YY (e.g. 01/08/26 → 2026)
   return { d, m, y };
 }
 
@@ -81,6 +82,22 @@ export async function GET(request) {
     for (const g of Object.values(kwGroups)) entries.push({ level: 'keyword', keyword: g.keyword, campaign: g.campaign, brand: g.brand, branded: isBranded(g.keyword), ...agg(g.rows) });
     for (const g of Object.values(campGroups)) entries.push({ level: 'campaign', keyword: '— ' + (g.adProperty || 'non-keyword') + ' —', campaign: g.campaign, brand: g.brand, branded: false, ...agg(g.rows) });
 
+    // ---------- Campaign budget utilisation (Instamart only) ----------
+    // TOTAL_BUDGET is the campaign allocated budget cap repeated on every row.
+    // Take MAX per campaign. Sum TOTAL_BUDGET_BURNT for total monthly spend.
+    const campBudgetMap = {};
+    for (const r of rows) {
+      const camp = (r['CAMPAIGN_NAME'] || 'Unknown');
+      if (!campBudgetMap[camp]) campBudgetMap[camp] = { burnt: 0, budget: 0 };
+      campBudgetMap[camp].burnt += toNum(r['TOTAL_BUDGET_BURNT']);
+      const b = toNum(r['TOTAL_BUDGET']);
+      if (b > campBudgetMap[camp].budget) campBudgetMap[camp].budget = b;
+    }
+    for (const e of entries) {
+      const cu = campBudgetMap[e.campaign];
+      e.budgetUtilization = (cu && cu.budget > 0) ? cu.burnt / cu.budget : null;
+    }
+
     // ---------- Rule lists ----------
     const pause = entries
       .filter(e => e.spend >= CFG.minPauseSpend && e.roas < CFG.breakevenRoas)
@@ -92,9 +109,21 @@ export async function GET(request) {
       .map(e => ({ ...e, estImpact: e.spend * CFG.bidDownSavingPct, recommendation: 'Cut bid 20–30%' }))
       .sort((a, b) => b.spend - a.spend).slice(0, CFG.maxRows);
 
+    // Scale: only recommend raising budget when the campaign is exhausting
+    // its allocated budget (>= budgetUtilizationThreshold). Null = unknown, excluded.
     const scale = entries
-      .filter(e => e.spend >= CFG.minScaleSpend && e.roas >= CFG.scaleRoasMin && !e.branded)
-      .map(e => ({ ...e, estImpact: e.spend * CFG.scaleBudgetUpliftPct * e.roas, recommendation: 'Raise budget ~' + Math.round(CFG.scaleBudgetUpliftPct * 100) + '%' }))
+      .filter(e =>
+        e.spend >= CFG.minScaleSpend &&
+        e.roas >= CFG.scaleRoasMin &&
+        !e.branded &&
+        e.budgetUtilization !== null &&
+        e.budgetUtilization >= CFG.budgetUtilizationThreshold
+      )
+      .map(e => ({
+        ...e,
+        estImpact: e.spend * CFG.scaleBudgetUpliftPct * e.roas,
+        recommendation: 'Raise budget ~' + Math.round(CFG.scaleBudgetUpliftPct * 100) + '% (budget ' + Math.round(e.budgetUtilization * 100) + '% used)',
+      }))
       .sort((a, b) => (b.spend * b.roas) - (a.spend * a.roas)).slice(0, CFG.maxRows);
 
     const negatives = entries
@@ -145,7 +174,7 @@ export async function GET(request) {
 
     const result = {
       platform: 'instamart', currentLabel: current.label, currentKey: current.key,
-      config: { breakevenRoas: CFG.breakevenRoas, bidDownRoasMax: CFG.bidDownRoasMax, scaleRoasMin: CFG.scaleRoasMin },
+      config: { breakevenRoas: CFG.breakevenRoas, bidDownRoasMax: CFG.bidDownRoasMax, scaleRoasMin: CFG.scaleRoasMin, budgetUtilizationThreshold: CFG.budgetUtilizationThreshold },
       summary, pause, bidDown, scale, negatives, branded, cities, dataHealth,
       fetchedAt: new Date().toISOString(),
     };
