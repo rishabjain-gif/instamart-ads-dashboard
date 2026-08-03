@@ -1,275 +1,263 @@
 'use client';
 import { useState, useEffect, Fragment } from 'react';
-import { SHEETS } from '@/lib/config';
-import { ZEPTO_SHEETS } from '@/lib/zeptoConfig';
 
-function fmtSpend(n) {
-  if (!n) return '₹0';
-  if (n >= 10000000) return '₹' + (n/10000000).toFixed(1) + 'Cr';
-  if (n >= 100000) return '₹' + (n/100000).toFixed(1) + 'L';
-  if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K';
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (n === 0) return '₹0';
+  if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + 'L';
+  if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
   return '₹' + n.toFixed(0);
 }
-function RoasCell({ value }) {
-  if (!value) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
-  return <td className="px-3 py-2 text-center text-sm text-gray-800">{value.toFixed(2)}x</td>;
-}
-function ChangeCell({ value, invert = false }) {
-  if (value === null || value === undefined) return <td className="px-3 py-2 text-center text-gray-400 text-sm">—</td>;
-  const isGood = invert ? value < 0 : value > 0;
-  const color = isGood ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
-  const arrow = value > 0 ? '▲' : '▼';
-  return <td className={'px-3 py-2 text-center text-sm font-medium ' + color}>{arrow} {Math.abs(value).toFixed(1)}%</td>;
+
+function roasFmt(n) {
+  if (!n && n !== 0) return '—';
+  return n.toFixed(2) + 'x';
 }
 
-function getDefaultDates() {
+function DeltaCell({ from, to, invert = false }) {
+  if (!from && from !== 0) return <td className="px-2 py-1.5 text-center text-gray-300 text-xs">—</td>;
+  if (!from) return <td className="px-2 py-1.5 text-center text-gray-300 text-xs">new</td>;
+  const delta = ((to - from) / Math.abs(from)) * 100;
+  const good = invert ? delta < 0 : delta > 0;
+  const neutral = Math.abs(delta) < 0.5;
+  const cls = neutral ? 'text-gray-400' : good ? 'text-green-700' : 'text-red-600';
+  return (
+    <td className={'px-2 py-1.5 text-center text-xs font-medium ' + cls}>
+      {delta > 0 ? '+' : ''}{delta.toFixed(1)}%
+    </td>
+  );
+}
+
+function getDefaults() {
   const today = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
-  const endA = new Date(today);
-  const startA = new Date(today); startA.setDate(today.getDate() - 6);
-  const endB = new Date(today); endB.setDate(today.getDate() - 7);
-  const startB = new Date(today); startB.setDate(today.getDate() - 13);
-  return { startA: fmt(startA), endA: fmt(endA), startB: fmt(startB), endB: fmt(endB) };
+  const f = d => d.toISOString().split('T')[0];
+  const endB = new Date(today);
+  const startB = new Date(today); startB.setDate(today.getDate() - 6);
+  const endA = new Date(today); endA.setDate(today.getDate() - 7);
+  const startA = new Date(today); startA.setDate(today.getDate() - 13);
+  return { startA: f(startA), endA: f(endA), startB: f(startB), endB: f(endB) };
 }
 
-// sheetOptions computed inside component based on platform
+function roas(gmv, spend) {
+  return spend > 0 ? gmv / spend : 0;
+}
+
+function buildTree(rows) {
+  const tree = {};
+  for (const row of rows) {
+    const { brand, cat, camp, kw, spendA, gmvA, spendB, gmvB } = row;
+
+    if (!tree[brand]) tree[brand] = { spendA: 0, gmvA: 0, spendB: 0, gmvB: 0, cats: {} };
+    tree[brand].spendA += spendA; tree[brand].gmvA += gmvA;
+    tree[brand].spendB += spendB; tree[brand].gmvB += gmvB;
+
+    const bNode = tree[brand];
+    if (!bNode.cats[cat]) bNode.cats[cat] = { spendA: 0, gmvA: 0, spendB: 0, gmvB: 0, camps: {} };
+    bNode.cats[cat].spendA += spendA; bNode.cats[cat].gmvA += gmvA;
+    bNode.cats[cat].spendB += spendB; bNode.cats[cat].gmvB += gmvB;
+
+    const cNode = bNode.cats[cat];
+    if (!cNode.camps[camp]) cNode.camps[camp] = { spendA: 0, gmvA: 0, spendB: 0, gmvB: 0, kws: [] };
+    cNode.camps[camp].spendA += spendA; cNode.camps[camp].gmvA += gmvA;
+    cNode.camps[camp].spendB += spendB; cNode.camps[camp].gmvB += gmvB;
+
+    if (kw) {
+      cNode.camps[camp].kws.push(row);
+    }
+  }
+  return tree;
+}
+
+function sortDesc(entries) {
+  return [...entries].sort((a, b) => (b[1].spendA || 0) - (a[1].spendA || 0));
+}
+
+const COLS = (
+  <tr className="bg-gray-800 text-white">
+    <th className="px-3 py-2.5 text-left font-semibold sticky left-0 bg-gray-800 z-10 min-w-[260px]">Brand / Category / Campaign / Keyword</th>
+    <th className="px-3 py-2.5 text-right font-semibold min-w-[80px]">Spend A</th>
+    <th className="px-3 py-2.5 text-right font-semibold min-w-[80px]">Spend B</th>
+    <th className="px-2 py-2.5 text-center font-semibold min-w-[68px]">Δ Spend</th>
+    <th className="px-3 py-2.5 text-center font-semibold min-w-[68px]">ROAS A</th>
+    <th className="px-3 py-2.5 text-center font-semibold min-w-[68px]">ROAS B</th>
+    <th className="px-2 py-2.5 text-center font-semibold min-w-[68px]">Δ ROAS</th>
+  </tr>
+);
 
 export default function PeriodComparison({ platform = 'instamart' }) {
-  const sheets = platform === 'zepto' ? ZEPTO_SHEETS : SHEETS;
-  const sheetOptions = Object.entries(sheets).map(([key, val]) => ({ key, label: val.label }));
-  const latestKey = Object.keys(sheets).sort().at(-1);
-  const defaults = getDefaultDates();
-  const [month, setMonth] = useState(latestKey);
-  const [startA, setStartA] = useState(defaults.startA);
-  const [endA, setEndA] = useState(defaults.endA);
-  const [startB, setStartB] = useState(defaults.startB);
-  const [endB, setEndB] = useState(defaults.endB);
+  const defs = getDefaults();
+  const [startA, setStartA] = useState(defs.startA);
+  const [endA, setEndA] = useState(defs.endA);
+  const [startB, setStartB] = useState(defs.startB);
+  const [endB, setEndB] = useState(defs.endB);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [expandedCats1, setExpandedCats1] = useState({});
-  const [expandedCats2, setExpandedCats2] = useState({});
+  // expanded state: key → true (open) | false (closed); default open for brand, closed below
+  const [exp, setExp] = useState({});
 
-  const runCompare = async (sA, eA, sB, eB, mon) => {
-    if (!sA || !eA || !sB || !eB) return;
-    setLoading(true); setError(null); setData(null);
+  const load = async (sA, eA, sB, eB) => {
+    setLoading(true); setError(null); setData(null); setExp({});
     try {
-      const params = new URLSearchParams({ month: mon, startA: sA, endA: eA, startB: sB, endB: eB });
-      const r = await fetch((platform === 'zepto' ? '/api/zepto/comparison' : '/api/comparison') + '?' + params);
+      const p = new URLSearchParams({ startA: sA, endA: eA, startB: sB, endB: eB });
+      const url = (platform === 'zepto' ? '/api/zepto/comparison' : '/api/comparison') + '?' + p;
+      const r = await fetch(url);
       const d = await r.json();
       if (d.error) throw new Error(d.error);
-      setData(d); setExpandedCats1({}); setExpandedCats2({});
+      setData(d);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    const d = getDefaultDates();
-    runCompare(d.startA, d.endA, d.startB, d.endB, latestKey);
-  }, []);
+  useEffect(() => { const d = getDefaults(); load(d.startA, d.endA, d.startB, d.endB); }, [platform]);
 
-  useEffect(() => {
-    const newSheets = platform === 'zepto' ? ZEPTO_SHEETS : SHEETS;
-    const newLatest = Object.keys(newSheets).sort().at(-1);
-    setMonth(newLatest);
-    setData(null);
-    const d = getDefaultDates();
-    runCompare(d.startA, d.endA, d.startB, d.endB, newLatest);
-  }, [platform]);
+  const toggle = k => setExp(p => ({ ...p, [k]: !open(k, p) }));
+  const open = (k, state = exp) => state[k] !== false; // default: open
 
-  const handleCompare = () => {
-    if (!startA || !endA || !startB || !endB) { setError('Please fill in all date fields.'); return; }
-    runCompare(startA, endA, startB, endB, month);
-  };
-
-  const toggle1 = cat => setExpandedCats1(p => ({ ...p, [cat]: !p[cat] }));
-  const toggle2 = cat => setExpandedCats2(p => ({ ...p, [cat]: !p[cat] }));
-
-  const byCategory1 = {};
-  if (data?.table1) for (const row of data.table1) {
-    if (!byCategory1[row.category]) byCategory1[row.category] = [];
-    byCategory1[row.category].push(row);
-  }
-  const byCategory2 = {};
-  if (data?.table2) for (const row of data.table2) {
-    if (!byCategory2[row.category]) byCategory2[row.category] = {};
-    if (!byCategory2[row.category][row.campaign]) byCategory2[row.category][row.campaign] = [];
-    byCategory2[row.category][row.campaign].push(row);
-  }
+  const tree = data?.rows ? buildTree(data.rows) : {};
+  const hasData = Object.keys(tree).length > 0;
 
   return (
-    <div className="space-y-8">
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h3 className="font-semibold text-gray-800">Select Month &amp; Date Ranges</h3>
-          <span className="text-xs text-gray-400 bg-blue-50 border border-blue-100 px-2 py-1 rounded">
-            Default: last 7 days vs prior 7 days
-          </span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Month</label>
-            <select value={month} onChange={e => setMonth(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {sheetOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-            </select>
+    <div className="space-y-4">
+      {/* Period filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
+            <span className="text-xs font-bold text-blue-700 shrink-0 w-16">Period A</span>
+            <input type="date" value={startA} onChange={e => setStartA(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <span className="text-gray-400 text-xs">→</span>
+            <input type="date" value={endA} onChange={e => setEndA(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
-          <div className="border border-blue-100 rounded-lg p-3 bg-blue-50">
-            <div className="text-xs font-semibold text-blue-700 mb-2">Period A — Base (older)</div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">From</label>
-                <input type="date" value={startA} onChange={e => setStartA(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">To</label>
-                <input type="date" value={endA} onChange={e => setEndA(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
+          <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5">
+            <span className="text-xs font-bold text-orange-700 shrink-0 w-16">Period B</span>
+            <input type="date" value={startB} onChange={e => setStartB(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400" />
+            <span className="text-gray-400 text-xs">→</span>
+            <input type="date" value={endB} onChange={e => setEndB(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400" />
           </div>
-          <div className="border border-orange-100 rounded-lg p-3 bg-orange-50">
-            <div className="text-xs font-semibold text-orange-700 mb-2">Period B — Compare (recent)</div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">From</label>
-                <input type="date" value={startB} onChange={e => setStartB(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">To</label>
-                <input type="date" value={endB} onChange={e => setEndB(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button onClick={handleCompare} disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {loading ? 'Loading…' : 'Compare Periods'}
+          <button onClick={() => load(startA, endA, startB, endB)} disabled={loading}
+            className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            {loading ? 'Loading…' : 'Compare'}
           </button>
-          {loading && <p className="text-sm text-gray-500">Fetching data… may take 15–20 seconds</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
         </div>
+        <p className="text-xs text-gray-400 mt-2">Δ ROAS: green = improved in Period B • Δ Spend: directional only</p>
       </div>
 
-      {data && (
-        <>
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-3">Category → Ad Property Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">ROAS Δ% = change from Period A to Period B. Red = deterioration.</p>
-            <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-gray-800 text-white">
-                    {platform === 'zepto' ? <th className="px-4 py-3 text-left font-semibold w-64">Category / Brand</th> : <th className="px-4 py-3 text-left font-semibold w-64">Category / Ad Property</th>}
-                    <th className="px-3 py-3 text-right font-semibold">Spend A</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS A</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS B</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CPC Δ%<br/><span className="font-normal text-gray-400 text-xs">(↑ bad)</span></th>
-                    <th className="px-3 py-3 text-center font-semibold">CVR Δ%<br/><span className="font-normal text-gray-400 text-xs">(↓ bad)</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(byCategory1).map(cat => {
-                    const rows = byCategory1[cat];
-                    const isExpanded = expandedCats1[cat] !== false;
-                    const catSpend = rows.reduce((s, r) => s + (r.spendA || 0), 0);
-                    return (
-                      <Fragment key={cat}>
-                        <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle1(cat)}>
-                          <td className="px-4 py-2.5 font-semibold text-gray-800">
-                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : 'â¶'}</span>{cat}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
-                          <td colSpan={5} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{rows.length} ad type{rows.length !== 1 ? 's' : ''}</td>
-                        </tr>
-                        {isExpanded && rows.map((row, idx) => (
-                          <tr key={cat + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-4 py-2.5 pl-8 text-gray-700"><span className="text-gray-400 mr-2">â</span>{row.adProperty}</td>
-                            <td className="px-3 py-2 text-right text-gray-700">{fmtSpend(row.spendA)}</td>
-                            <RoasCell value={row.roasA} />
-                            <RoasCell value={row.roasB} />
-                            <ChangeCell value={row.roasChange} />
-                            <ChangeCell value={row.cpcChange} invert={true} />
-                            <ChangeCell value={row.cvrChange} />
-                          </tr>
-                        ))}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      {loading && (
+        <div className="text-center py-12 text-sm text-gray-400 animate-pulse">Fetching comparison data…</div>
+      )}
 
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-1">Category → Campaign → Keyword Breakdown</h3>
-            <p className="text-xs text-gray-500 mb-3">Keyword Based Ads only • % of Category Spend based on Period A • Sorted by spend</p>
-            <div className="overflow-auto max-h-[70vh] rounded-xl border border-gray-200 shadow-sm">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-gray-800 text-white">
-                    <th className="px-4 py-3 text-left font-semibold w-72">Category / Campaign / Keyword</th>
-                    <th className="px-3 py-3 text-right font-semibold">Spend A</th>
-                    <th className="px-3 py-3 text-center font-semibold">% of Cat</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS A</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS B</th>
-                    <th className="px-3 py-3 text-center font-semibold">ROAS Δ%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CPC Δ%</th>
-                    <th className="px-3 py-3 text-center font-semibold">CVR Δ%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(byCategory2).map(cat => {
-                    const campaigns = byCategory2[cat];
-                    const isExpanded = expandedCats2[cat] !== false;
-                    const catSpend = Object.values(campaigns).flat().reduce((s, r) => s + (r.spendA || 0), 0);
-                    return (
-                      <Fragment key={cat}>
-                        <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200" onClick={() => toggle2(cat)}>
-                          <td className="px-4 py-2.5 font-semibold text-gray-800">
-                            <span className="text-gray-400 text-xs mr-2">{isExpanded ? '▼' : 'â¶'}</span>{cat}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{fmtSpend(catSpend)}</td>
-                          <td colSpan={6} className="px-3 py-2.5 text-center text-gray-400 text-xs italic">{Object.keys(campaigns).length} campaign{Object.keys(campaigns).length !== 1 ? 's' : ''}</td>
-                        </tr>
-                        {isExpanded && Object.keys(campaigns).map(campaign => {
-                          const kwRows = campaigns[campaign];
-                          const campSpend = kwRows.reduce((s, r) => s + (r.spendA || 0), 0);
-                          return (
-                            <Fragment key={cat + '-' + campaign}>
-                              <tr className="bg-blue-50">
-                                <td className="px-4 py-2 pl-8 font-medium text-blue-800"><span className="text-gray-400 mr-2">â</span>{campaign}</td>
-                                <td className="px-3 py-2 text-right text-blue-800 font-medium">{fmtSpend(campSpend)}</td>
-                                <td colSpan={6} className="px-3 py-2 text-center text-blue-400 text-xs italic">{kwRows.length} keyword{kwRows.length !== 1 ? 's' : ''}</td>
-                              </tr>
-                              {kwRows.map((row, kwIdx) => (
-                                <tr key={cat + '-' + campaign + '-' + kwIdx} className={kwIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                  <td className="px-4 py-2 pl-14 text-gray-600"><span className="text-gray-300 mr-2">â</span>{row.keyword}</td>
-                                  <td className="px-3 py-2 text-right text-gray-700">{fmtSpend(row.spendA)}</td>
-                                  <td className="px-3 py-2 text-center text-gray-600">{row.pctOfCatSpend > 0 ? row.pctOfCatSpend.toFixed(1) + '%' : '—'}</td>
-                                  <RoasCell value={row.roasA} />
-                                  <RoasCell value={row.roasB} />
-                                  <ChangeCell value={row.roasChange} />
-                                  <ChangeCell value={row.cpcChange} invert={true} />
-                                  <ChangeCell value={row.cvrChange} />
+      {data && !hasData && (
+        <div className="text-center py-12 text-sm text-gray-400">No data found for the selected date ranges.</div>
+      )}
+
+      {hasData && (
+        <div className="overflow-auto rounded-xl border border-gray-200 shadow-sm max-h-[75vh]">
+          <table className="min-w-full text-xs">
+            <thead className="sticky top-0 z-20">{COLS}</thead>
+            <tbody>
+              {sortDesc(Object.entries(tree)).map(([brand, bNode]) => {
+                const bKey = 'b:' + brand;
+                const bOpen = open(bKey);
+                const bRoasA = roas(bNode.gmvA, bNode.spendA);
+                const bRoasB = roas(bNode.gmvB, bNode.spendB);
+                return (
+                  <Fragment key={bKey}>
+                    {/* Brand row */}
+                    <tr className="bg-gray-900 text-white cursor-pointer hover:bg-gray-700 select-none"
+                      onClick={() => toggle(bKey)}>
+                      <td className="px-3 py-2 font-bold sticky left-0 bg-gray-900 z-10">
+                        <span className="text-gray-400 text-xs mr-1.5">{bOpen ? '▼' : '▶'}</span>
+                        {brand}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold">{fmt(bNode.spendA)}</td>
+                      <td className="px-3 py-2 text-right font-semibold">{fmt(bNode.spendB)}</td>
+                      <DeltaCell from={bNode.spendA} to={bNode.spendB} />
+                      <td className="px-3 py-2 text-center">{roasFmt(bRoasA)}</td>
+                      <td className="px-3 py-2 text-center">{roasFmt(bRoasB)}</td>
+                      <DeltaCell from={bRoasA} to={bRoasB} />
+                    </tr>
+
+                    {bOpen && sortDesc(Object.entries(bNode.cats)).map(([cat, cNode]) => {
+                      const cKey = bKey + '|c:' + cat;
+                      const cOpen = open(cKey);
+                      const cRoasA = roas(cNode.gmvA, cNode.spendA);
+                      const cRoasB = roas(cNode.gmvB, cNode.spendB);
+                      return (
+                        <Fragment key={cKey}>
+                          {/* Category row */}
+                          <tr className="bg-gray-100 cursor-pointer hover:bg-gray-200 select-none"
+                            onClick={() => toggle(cKey)}>
+                            <td className="px-3 py-2 pl-7 font-semibold text-gray-800 sticky left-0 bg-gray-100 z-10">
+                              <span className="text-gray-400 text-xs mr-1.5">{cOpen ? '▼' : '▶'}</span>
+                              {cat}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-700">{fmt(cNode.spendA)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-gray-700">{fmt(cNode.spendB)}</td>
+                            <DeltaCell from={cNode.spendA} to={cNode.spendB} />
+                            <td className="px-3 py-2 text-center text-gray-700">{roasFmt(cRoasA)}</td>
+                            <td className="px-3 py-2 text-center text-gray-700">{roasFmt(cRoasB)}</td>
+                            <DeltaCell from={cRoasA} to={cRoasB} />
+                          </tr>
+
+                          {cOpen && sortDesc(Object.entries(cNode.camps)).map(([camp, campNode]) => {
+                            const campKey = cKey + '|camp:' + camp;
+                            const campOpen = open(campKey);
+                            const campRoasA = roas(campNode.gmvA, campNode.spendA);
+                            const campRoasB = roas(campNode.gmvB, campNode.spendB);
+                            const hasKws = campNode.kws.length > 0;
+                            return (
+                              <Fragment key={campKey}>
+                                {/* Campaign row */}
+                                <tr className={'bg-blue-50 select-none ' + (hasKws ? 'cursor-pointer hover:bg-blue-100' : '')}
+                                  onClick={() => hasKws && toggle(campKey)}>
+                                  <td className="px-3 py-2 pl-12 font-medium text-blue-800 sticky left-0 bg-blue-50 z-10">
+                                    {hasKws
+                                      ? <span className="text-blue-300 text-xs mr-1.5">{campOpen ? '▼' : '▶'}</span>
+                                      : <span className="text-blue-200 mr-1.5">•</span>}
+                                    {camp.length > 40 ? camp.slice(0, 40) + '…' : camp}
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-blue-800 font-medium">{fmt(campNode.spendA)}</td>
+                                  <td className="px-3 py-2 text-right text-blue-800 font-medium">{fmt(campNode.spendB)}</td>
+                                  <DeltaCell from={campNode.spendA} to={campNode.spendB} />
+                                  <td className="px-3 py-2 text-center text-blue-700">{roasFmt(campRoasA)}</td>
+                                  <td className="px-3 py-2 text-center text-blue-700">{roasFmt(campRoasB)}</td>
+                                  <DeltaCell from={campRoasA} to={campRoasB} />
                                 </tr>
-                              ))}
-                            </Fragment>
-                          );
-                        })}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
+
+                                {campOpen && campNode.kws
+                                  .sort((a, b) => b.spendA - a.spendA)
+                                  .map((row, ki) => (
+                                    <tr key={campKey + '-kw-' + ki}
+                                      className={ki % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                      <td className="px-3 py-1.5 pl-[68px] text-gray-600 sticky left-0 z-10"
+                                        style={{ backgroundColor: ki % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+                                        {row.kw}
+                                      </td>
+                                      <td className="px-3 py-1.5 text-right text-gray-700">{fmt(row.spendA)}</td>
+                                      <td className="px-3 py-1.5 text-right text-gray-700">{fmt(row.spendB)}</td>
+                                      <DeltaCell from={row.spendA} to={row.spendB} />
+                                      <td className="px-3 py-1.5 text-center text-gray-700">{roasFmt(row.roasA)}</td>
+                                      <td className="px-3 py-1.5 text-center text-gray-700">{roasFmt(row.roasB)}</td>
+                                      <DeltaCell from={row.roasA} to={row.roasB} />
+                                    </tr>
+                                  ))}
+                              </Fragment>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
