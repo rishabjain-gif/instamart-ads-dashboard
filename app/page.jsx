@@ -9,6 +9,7 @@ const CampaignInsights  = dynamic(() => import('@/components/CampaignInsights'),
 const Actions           = dynamic(() => import('@/components/Actions'),           { ssr: false });
 const Actionables       = dynamic(() => import('@/components/Actionables'),       { ssr: false });
 const ChangeLog         = dynamic(() => import('@/components/ChangeLog'),         { ssr: false });
+const KeywordCityBreakdown = dynamic(() => import('@/components/KeywordCityBreakdown'), { ssr: false });
 
 const TABS = [
   { id: 'monthly',    label: '📅 Monthly ROAS'       },
@@ -90,6 +91,7 @@ export default function Home() {
         {activeTab === 'insights'   && <CampaignInsights platform={platform} />}
         {activeTab === 'actions'    && <Actions          platform={platform} />}
         {activeTab === 'actionables' && <Actionables      platform={platform} />}
+        {activeTab === 'actionables' && platform === 'instamart' && <KeywordCityBreakdown />}
         {activeTab === 'changelog'  && <ChangeLog        platform={platform} />}
       </div>
     </div>
