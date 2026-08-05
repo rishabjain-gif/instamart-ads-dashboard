@@ -9,7 +9,7 @@ function fmt(n) {
 }
 
 function RoasBadge({ roas }) {
-  const color = roas >= 1 ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50';
+  const color = roas >= 1.2 ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50';
   return (
     <span className={'text-xs font-semibold px-1.5 py-0.5 rounded ' + color}>
       {roas.toFixed(2)}x
@@ -45,7 +45,7 @@ export default function KeywordCityBreakdown() {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Low ROAS Keywords — City Breakdown</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Keywords with MTD ROAS &lt; 1× | sorted by spend</p>
+          <p className="text-xs text-gray-500 mt-0.5">Keywords with MTD ROAS &lt; 1.2× | sorted by spend</p>
         </div>
       </div>
       <div className="px-5 py-8 text-center text-xs text-gray-400 animate-pulse">Loading…</div>
@@ -66,7 +66,7 @@ export default function KeywordCityBreakdown() {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Low ROAS Keywords — City Breakdown</h3>
-          <p className="text-xs text-gray-500 mt-0.5">{month} · Keywords with MTD ROAS &lt; 1× · sorted by spend ↓</p>
+          <p className="text-xs text-gray-500 mt-0.5">{month} · Keywords with MTD ROAS &lt; 1.2× · sorted by spend ↓</p>
         </div>
         {keywords.length > 0 && (
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full border border-red-200 text-red-600 bg-red-50">
@@ -76,7 +76,7 @@ export default function KeywordCityBreakdown() {
       </div>
 
       {keywords.length === 0 ? (
-        <div className="px-5 py-8 text-center text-xs text-gray-400">No keywords with ROAS &lt; 1× this month ✅</div>
+        <div className="px-5 py-8 text-center text-xs text-gray-400">No keywords with ROAS &lt; 1.2× this month ✅</div>
       ) : (
         <div className="overflow-auto max-h-[70vh]">
           <table className="min-w-full text-xs">
