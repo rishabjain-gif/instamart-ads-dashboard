@@ -11,6 +11,7 @@ async function fetchSheet(url) {
   const resp = await fetch(url, { next: { revalidate: 300 } });
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
   return parseCSV(await resp.text());
+}
 
 
 export async function GET() {
