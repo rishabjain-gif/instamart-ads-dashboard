@@ -11,7 +11,7 @@ async function fetchSheet(url) {
   const resp = await fetch(url, { next: { revalidate: 300 } });
   if (!resp.ok) throw new Error('Sheet fetch failed: ' + resp.status);
   return parseCSV(await resp.text());
-}
+
 
 export async function GET() {
   try {
@@ -45,7 +45,7 @@ export async function GET() {
 
     // Filter: only keywords with spend > 0 and ROAS < 1, sort by spend desc
     const keywords = Object.values(kwMap)
-      .filter(kw => kw.spend > 0 && kw.gmv / kw.spend < 1)
+      .filter(kw => kw.spend > 0 && kw.gmv / kw.spend < 1.2)
       .map(kw => ({
         keyword: kw.keyword,
         campaign: kw.campaign,
